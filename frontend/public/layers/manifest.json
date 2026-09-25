@@ -1,0 +1,89 @@
+{
+  "generated_utc": "2026-09-25T11:01:11+00:00",
+  "generator": "src/api/build_presentation_layers.py",
+  "purpose": "lightweight DISPLAY images derived from the real rasters; the sources are read-only and routing never reads these",
+  "environment_date": "2025-01-08",
+  "layers": {
+    "sic": {
+      "file": "sic.png",
+      "width": 316,
+      "height": 332,
+      "bytes": 42041,
+      "source": "/Users/vihaangala/Desktop/SIH/data/raw/sic_20250108.tif",
+      "source_sha256": "61ea86060484c3d9fd438de5730aa82998d85a1446d116e7dd30f215a3d6c494",
+      "epsg": 3976,
+      "extent": [
+        -3950000.0,
+        -3950000.0,
+        3950000.0,
+        4350000.0
+      ],
+      "factor": 4,
+      "reduction": "block mean over valid cells only",
+      "value": "sea-ice concentration, percent",
+      "valid_rule": "0 <= value <= 100 and finite; nothing gap-filled",
+      "transparent_where": "no valid cell in the block"
+    },
+    "land": {
+      "file": "land.png",
+      "width": 316,
+      "height": 332,
+      "bytes": 2305,
+      "source": "/Users/vihaangala/Desktop/SIH/data/processed/bedmachine/bedmachine_mask_3976.tif",
+      "source_sha256": "139f29757b5ed876681eb9f70baabae7464faaad766e2a098ac49c39e3af6c9e",
+      "epsg": 3976,
+      "extent": [
+        -3950000.0,
+        -3950000.0,
+        3950000.0,
+        4350000.0
+      ],
+      "factor": 4,
+      "classes_kept": [
+        1,
+        2,
+        4
+      ],
+      "class_meaning": "0=ocean; 1=ice_free_land; 2=grounded_ice; 3=floating_ice; 4=lake_vostok",
+      "reduction": "block ANY: a screen cell is drawn if any of its grid cells belongs to these classes",
+      "display_only": "GENERALISED OUTLINE, deliberately over-inclusive. Routing reads the full-resolution exclusion mask and never these images.",
+      "note": "ice-free land, grounded ice and Lake Vostok: the continent"
+    },
+    "no_coverage": {
+      "file": "no_coverage.png",
+      "width": 316,
+      "height": 332,
+      "bytes": 931,
+      "source": "/Users/vihaangala/Desktop/SIH/data/processed/bedmachine/bedmachine_mask_3976.tif",
+      "source_sha256": "139f29757b5ed876681eb9f70baabae7464faaad766e2a098ac49c39e3af6c9e",
+      "epsg": 3976,
+      "extent": [
+        -3950000.0,
+        -3950000.0,
+        3950000.0,
+        4350000.0
+      ],
+      "factor": 4,
+      "classes_kept": [
+        255
+      ],
+      "class_meaning": "0=ocean; 1=ice_free_land; 2=grounded_ice; 3=floating_ice; 4=lake_vostok",
+      "reduction": "block ANY: a screen cell is drawn if any of its grid cells belongs to these classes",
+      "display_only": "GENERALISED OUTLINE, deliberately over-inclusive. Routing reads the full-resolution exclusion mask and never these images.",
+      "note": "outside BedMachine coverage. Excluded by the routing mask for want of data, NOT because it is land."
+    }
+  },
+  "crs": {
+    "file": "/Users/vihaangala/Desktop/SIH/frontend/src/generated/crs.ts",
+    "epsg": 3976,
+    "proj4_verbatim": "+proj=stere +lat_0=-90 +lat_ts=-70 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs=True",
+    "proj4_for_proj4js": "+proj=stere +lat_0=-90 +lat_ts=-70 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
+    "extent": [
+      -3950000.0,
+      -3950000.0,
+      3950000.0,
+      4350000.0
+    ],
+    "normalisation": "+no_defs=True -> +no_defs, for proj4js only"
+  }
+}

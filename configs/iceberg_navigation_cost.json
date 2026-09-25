@@ -1,0 +1,46 @@
+{
+  "description": "Configuration for folding the iceberg exposure index into the existing time-indexed navigation cost (src/routing/iceberg_navigation_cost.py). iceberg_exposure_weight is a PROJECT ROUTING PARAMETER. It is not a POLARIS quantity, not a physical constant, not a collision probability, and not prescribed by IMO, WMO or NCPOR. It converts a dimensionless exposure index in [0,1] into the same arbitrary units the rest of the composed cost already uses.",
+  "iceberg_exposure_weight": 5.0,
+  "weight_rationale": [
+    "Ships at 5.0. The value was selected from a read-only sensitivity study, not guessed and not taken from any published figure. The study priced a deliberately ASYMMETRIC controlled scenario: a straight 120 km corridor crossing a modelled iceberg cone (peak exposure 0.85) against a clear detour around a barrier costing 193.14 km, a real +60.9 % in distance, with the composed cost held uniform so only the iceberg term could move the route.",
+    "In that scenario the planner switched from the exposed shortcut to the clear detour at a break-even weight of approximately 2.868. Two independent methods agreed to six decimals: bisection on this module's own cost_fn, and the closed form detour_penalty / exposure_integral = 73137 / 25500. Weights 0, 1 and 2.5 kept the shortcut; 5, 10, 25 and 50 took the detour.",
+    "5.0 sits above that break-even, so in that scenario the planner pays a measurable detour rather than cross the cone. It is a PROJECT ROUTING PARAMETER, not a POLARIS quantity, not a physical constant and not a collision probability. It converts a dimensionless exposure index in [0,1] into the same arbitrary units the rest of the composed cost already uses.",
+    "Setting this back to 0.0 still reproduces the existing composed cost bit for bit. That zero-weight identity is covered by a test which constructs an explicit weight-0 provider and does not read the shipped value, so it holds whatever ships here."
+  ],
+  "limits": {
+    "min_weight": 0.0,
+    "max_weight": 1000.0,
+    "must_be_finite": true
+  },
+  "formula": "final_cost = existing_composed_cost + iceberg_exposure_weight * iceberg_exposure",
+  "exposure_source": {
+    "module": "src/routing/iceberg_risk.py",
+    "range": [0.0, 1.0],
+    "is_a_probability": false,
+    "note": "the exposure index is max-combined across icebergs by iceberg_risk; this layer consumes that field and does not recombine anything"
+  },
+  "temporal": {
+    "lookup": "the vessel's ARRIVAL time at the cell",
+    "bucket_convention": "reused verbatim from time_navigation_cost.TimeIndexedNavigationCost.bucket_for; this module never restates floor((t - start)/bucket_seconds)",
+    "mismatch_policy": "reject",
+    "mismatch_note": "an exposure field whose forecast start date differs from the composed field's environment date is refused by default. allow_historical_demo_mismatch=True permits it and stamps the result, exactly as time_navigation_cost already does."
+  },
+  "missing_exposure": {
+    "policy": "error",
+    "available_policies": ["error", "omit_iceberg_term"],
+    "state_when_unavailable": "iceberg_exposure_unavailable",
+    "note": "a bucket with no exposure field is NOT read as zero exposure. 'error' raises. 'omit_iceberg_term' adds nothing but stamps the cell state iceberg_exposure_unavailable, so the absence is visible in the audit rather than indistinguishable from open water. Neither policy fabricates an exposure value."
+  },
+  "no_hard_mask": true,
+  "no_hard_mask_note": "this layer adds a finite preference term and produces no blocked, no-go, navigable or exclusion mask. Hard constraints belong to NavigationDomain and constraints.py.",
+  "known_limitations": [
+    "The exposure field is only as complete as the iceberg population behind it: 37 distinct icebergs, all ASCAT. Exposure 0 means no MODELED exposure, never 'no ice here'.",
+    "Exposure buckets above the 24 h calibrated horizon carry extrapolated uncertainty radii; the flag travels with every cell result but the cost arithmetic does not treat them differently.",
+    "One routing cell is 6250 m while a 24 h cone is about 18 km across, so an iceberg influences only a handful of cells. This term is sharp, not smooth.",
+    "The weight is NOT physically calibrated. 5.0 was chosen against ONE synthetic controlled scenario. The break-even weight is the ratio of detour cost to accumulated exposure, so it is scenario-dependent: different corridor geometry, a non-uniform composed cost or a weaker cone all move it. This value has not been validated against real routes, real transits or any operational standard, and it carries no physical meaning."
+  ],
+  "not_included": [
+    "Pareto routing", "route selection", "frontend", "collision probability",
+    "any change to the composed cost, the exposure layer or time_astar"
+  ]
+}

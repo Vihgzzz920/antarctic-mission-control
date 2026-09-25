@@ -1,0 +1,36 @@
+{
+  "description": "Parameters for the first-order current + windage iceberg drift baseline (src/models/iceberg_physics.py). THESE ARE PROJECT MODEL PARAMETERS, NOT PHYSICAL OR REGULATORY CONSTANTS. No value here is prescribed by IMO, WMO, NCPOR or any published standard, and none should be presented as validated science. They exist so the model can be run, measured and revised from data rather than from assertion.",
+  "windage_coefficient": 0.0,
+  "wind_turn_deg": 0.0,
+  "limits": {
+    "windage_coefficient": {
+      "min": 0.0,
+      "max": 0.1,
+      "meaning": "dimensionless fraction of the 10 m wind speed added to the ocean current"
+    },
+    "wind_turn_deg": {
+      "min": -90.0,
+      "max": 90.0,
+      "meaning": "degrees the 10 m wind vector is rotated before the windage term is taken"
+    }
+  },
+  "turn_sign_convention": "positive = counter-clockwise in the local (east, north) plane, i.e. east rotates toward north. In the Southern Hemisphere a Coriolis-style deflection to the LEFT of the wind is a POSITIVE angle under this convention. The sign is stated here so a fitted value can be read unambiguously; it is not a claim about which sign is correct.",
+  "defaults_rationale": [
+    "Both parameters ship at 0.0 on purpose. A windage coefficient of 0.0 makes the baseline pure ocean current, which is an honest starting point that asserts nothing about wind forcing.",
+    "Published iceberg windage figures exist in the literature, but transcribing one here would present a borrowed number as this project's measured result. The calibration path in iceberg_physics.py derives a value from this project's own matched observations instead, on a chronological training split, and reports it separately from these configured values.",
+    "This mirrors how configs/navigation_cost_composition.json ships coverage_uncertainty_weight = 0.0: do not invent a weighting before measuring one."
+  ],
+  "integration": {
+    "scheme": "constant velocity over the step: displacement = velocity * elapsed_seconds",
+    "basis": "vectors are combined in the EPSG:3976 local basis (the convention src/data/preprocess_currents.py already uses for the GLORYS rasters), then expressed back in the local geographic east/north tangent plane for integration",
+    "why_not_projected_metres": "EPSG:3976 is polar stereographic with its standard parallel at 70S, so projected distance is stretched away from that latitude (about +4% at 60S). Integrating raw m/s as projected metres would bake that scale factor into the trajectory. The tangent plane also matches how the observed step velocities in iceberg_steps.csv were derived, so prediction and truth share one geometry.",
+    "earth_radius_m": 6371008.8,
+    "earth_radius_note": "IUGG mean radius; the same value src/data/preprocess_icebergs.py used to derive the observed velocities this model is scored against"
+  },
+  "honest_description": "first-order current + windage drift baseline",
+  "not_claimed": [
+    "This is not a full physical simulation. There is no iceberg mass, draft, sail area, added mass, wave radiation force, sea-ice drag, Coriolis term or grounding.",
+    "Constant velocity over the whole step is an approximation that degrades as the step lengthens.",
+    "The wind is sampled once, at 00 UTC on the step's start date, because the BYU/NIC observations carry no time of day."
+  ]
+}

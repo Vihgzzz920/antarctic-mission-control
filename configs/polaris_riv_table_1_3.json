@@ -1,0 +1,223 @@
+{
+  "source": "IMO MSC.1/Circ.1519, Appendix, Table 1.3 (Risk Index Values, standard) and Table 1.1 (Risk Index Outcome criteria). Values obtained 2026-09-25 by cross-checked automated reading of two independent reproductions (nautinst.org PDF of the IMO DOCX; imorules.com HTML). The two sources disagreed on exactly one cell -- IA Super x Thick First Year Ice (-2 vs -3) -- resolved to -2 by the project team against further independent published reproductions. NOT YET line-by-line eye-verified against an IMO-issued copy of the circular; that check is still outstanding.",
+  "ice_classes": {
+    "PC1": "polar_class",
+    "PC2": "polar_class",
+    "PC3": "polar_class",
+    "PC4": "polar_class",
+    "PC5": "polar_class",
+    "PC6": "polar_class",
+    "PC7": "polar_class",
+    "IA Super": "below_polar_class",
+    "IA": "below_polar_class",
+    "IB": "below_polar_class",
+    "IC": "below_polar_class",
+    "Not Ice Strengthened": "no_ice_class"
+  },
+  "riv": {
+    "PC1": {
+      "Ice-Free": 3,
+      "New Ice": 3,
+      "Grey Ice": 3,
+      "Grey White Ice": 3,
+      "Thin First Year Ice 1st Stage": 2,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": 2,
+      "Medium First Year Ice": 2,
+      "Medium First Year Ice less than 1 m thick": 2,
+      "Thick First Year Ice": 2,
+      "Second Year Ice": 2,
+      "Light Multi Year Ice less than 2.5 m thick": 1,
+      "Heavy Multi Year Ice": 1
+    },
+    "PC2": {
+      "Ice-Free": 3,
+      "New Ice": 3,
+      "Grey Ice": 3,
+      "Grey White Ice": 3,
+      "Thin First Year Ice 1st Stage": 2,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": 2,
+      "Medium First Year Ice": 2,
+      "Medium First Year Ice less than 1 m thick": 2,
+      "Thick First Year Ice": 2,
+      "Second Year Ice": 1,
+      "Light Multi Year Ice less than 2.5 m thick": 1,
+      "Heavy Multi Year Ice": 0
+    },
+    "PC3": {
+      "Ice-Free": 3,
+      "New Ice": 3,
+      "Grey Ice": 3,
+      "Grey White Ice": 3,
+      "Thin First Year Ice 1st Stage": 2,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": 2,
+      "Medium First Year Ice": 2,
+      "Medium First Year Ice less than 1 m thick": 2,
+      "Thick First Year Ice": 2,
+      "Second Year Ice": 1,
+      "Light Multi Year Ice less than 2.5 m thick": 0,
+      "Heavy Multi Year Ice": -1
+    },
+    "PC4": {
+      "Ice-Free": 3,
+      "New Ice": 3,
+      "Grey Ice": 3,
+      "Grey White Ice": 3,
+      "Thin First Year Ice 1st Stage": 2,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": 2,
+      "Medium First Year Ice": 2,
+      "Medium First Year Ice less than 1 m thick": 2,
+      "Thick First Year Ice": 1,
+      "Second Year Ice": 0,
+      "Light Multi Year Ice less than 2.5 m thick": -1,
+      "Heavy Multi Year Ice": -2
+    },
+    "PC5": {
+      "Ice-Free": 3,
+      "New Ice": 3,
+      "Grey Ice": 3,
+      "Grey White Ice": 3,
+      "Thin First Year Ice 1st Stage": 2,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": 2,
+      "Medium First Year Ice": 1,
+      "Medium First Year Ice less than 1 m thick": 1,
+      "Thick First Year Ice": 0,
+      "Second Year Ice": -1,
+      "Light Multi Year Ice less than 2.5 m thick": -2,
+      "Heavy Multi Year Ice": -2
+    },
+    "PC6": {
+      "Ice-Free": 3,
+      "New Ice": 2,
+      "Grey Ice": 2,
+      "Grey White Ice": 2,
+      "Thin First Year Ice 1st Stage": 2,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": 1,
+      "Medium First Year Ice": 1,
+      "Medium First Year Ice less than 1 m thick": 0,
+      "Thick First Year Ice": -1,
+      "Second Year Ice": -2,
+      "Light Multi Year Ice less than 2.5 m thick": -3,
+      "Heavy Multi Year Ice": -3
+    },
+    "PC7": {
+      "Ice-Free": 3,
+      "New Ice": 2,
+      "Grey Ice": 2,
+      "Grey White Ice": 2,
+      "Thin First Year Ice 1st Stage": 1,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": 1,
+      "Medium First Year Ice": 0,
+      "Medium First Year Ice less than 1 m thick": -1,
+      "Thick First Year Ice": -2,
+      "Second Year Ice": -3,
+      "Light Multi Year Ice less than 2.5 m thick": -3,
+      "Heavy Multi Year Ice": -3
+    },
+    "IA Super": {
+      "Ice-Free": 3,
+      "New Ice": 2,
+      "Grey Ice": 2,
+      "Grey White Ice": 2,
+      "Thin First Year Ice 1st Stage": 2,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": 1,
+      "Medium First Year Ice": 0,
+      "Medium First Year Ice less than 1 m thick": -1,
+      "Thick First Year Ice": -2,
+      "Second Year Ice": -3,
+      "Light Multi Year Ice less than 2.5 m thick": -4,
+      "Heavy Multi Year Ice": -4
+    },
+    "IA": {
+      "Ice-Free": 3,
+      "New Ice": 2,
+      "Grey Ice": 2,
+      "Grey White Ice": 2,
+      "Thin First Year Ice 1st Stage": 1,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": 0,
+      "Medium First Year Ice": -1,
+      "Medium First Year Ice less than 1 m thick": -2,
+      "Thick First Year Ice": -3,
+      "Second Year Ice": -4,
+      "Light Multi Year Ice less than 2.5 m thick": -5,
+      "Heavy Multi Year Ice": -5
+    },
+    "IB": {
+      "Ice-Free": 3,
+      "New Ice": 2,
+      "Grey Ice": 2,
+      "Grey White Ice": 1,
+      "Thin First Year Ice 1st Stage": 0,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": -1,
+      "Medium First Year Ice": -2,
+      "Medium First Year Ice less than 1 m thick": -3,
+      "Thick First Year Ice": -4,
+      "Second Year Ice": -5,
+      "Light Multi Year Ice less than 2.5 m thick": -6,
+      "Heavy Multi Year Ice": -6
+    },
+    "IC": {
+      "Ice-Free": 3,
+      "New Ice": 2,
+      "Grey Ice": 1,
+      "Grey White Ice": 0,
+      "Thin First Year Ice 1st Stage": -1,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": -2,
+      "Medium First Year Ice": -3,
+      "Medium First Year Ice less than 1 m thick": -4,
+      "Thick First Year Ice": -5,
+      "Second Year Ice": -6,
+      "Light Multi Year Ice less than 2.5 m thick": -7,
+      "Heavy Multi Year Ice": -8
+    },
+    "Not Ice Strengthened": {
+      "Ice-Free": 3,
+      "New Ice": 1,
+      "Grey Ice": 0,
+      "Grey White Ice": -1,
+      "Thin First Year Ice 1st Stage": -2,
+      "Thin First Year Ice 2nd Stage less than 1 m thick": -3,
+      "Medium First Year Ice": -4,
+      "Medium First Year Ice less than 1 m thick": -5,
+      "Thick First Year Ice": -6,
+      "Second Year Ice": -7,
+      "Light Multi Year Ice less than 2.5 m thick": -8,
+      "Heavy Multi Year Ice": -8
+    }
+  },
+  "rio_bands": {
+    "polar_class": [
+      {
+        "min_rio": 0,
+        "category": "normal_operation"
+      },
+      {
+        "min_rio": -10,
+        "category": "elevated_operational_risk"
+      },
+      {
+        "min_rio": "-inf",
+        "category": "operation_subject_to_special_consideration"
+      }
+    ],
+    "below_polar_class": [
+      {
+        "min_rio": 0,
+        "category": "normal_operation"
+      },
+      {
+        "min_rio": "-inf",
+        "category": "operation_subject_to_special_consideration"
+      }
+    ],
+    "no_ice_class": [
+      {
+        "min_rio": 0,
+        "category": "normal_operation"
+      },
+      {
+        "min_rio": "-inf",
+        "category": "operation_subject_to_special_consideration"
+      }
+    ]
+  }
+}

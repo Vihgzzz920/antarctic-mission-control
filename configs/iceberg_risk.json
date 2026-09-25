@@ -1,0 +1,74 @@
+{
+  "description": "Configuration for the dynamic iceberg EXPOSURE layer (src/routing/iceberg_risk.py). The output is a PROJECT EXPOSURE INDEX in [0, 1]. It is NOT a collision probability, NOT a hit rate, NOT an official maritime safety metric, and NOT endorsed by IMO, WMO or NCPOR. It says only: how deep inside one iceberg's calibrated uncertainty cone does this routing cell lie.",
+  "exposure": {
+    "function": "linear",
+    "available_functions": ["linear", "constant"],
+    "linear_formula": "exposure = 1 - distance / radius  for distance < radius, else 0",
+    "constant_formula": "exposure = 1 for distance < radius, else 0",
+    "range": [0.0, 1.0],
+    "at_or_beyond_radius": 0.0,
+    "combination_rule": "max",
+    "combination_note": "cell_exposure = max over icebergs. Exposures are NOT summed and NOT averaged: two cones overlapping does not make a cell twice as exposed, and averaging would let a distant iceberg dilute a near one. The iceberg attaining the maximum is recorded per cell.",
+    "is_a_probability": false
+  },
+  "distance": {
+    "method": "great_circle",
+    "function": "src.data.preprocess_icebergs.great_circle_m",
+    "units": "metres",
+    "why": "The uncertainty radius was calibrated as the q90 of RADIAL GREAT-CIRCLE endpoint errors. Testing a cell against that radius in any other metric would compare two different quantities. Cell centre latitude/longitude come from the cached routing-grid geometry that preprocess_currents already built, so no cell coordinate is recomputed here.",
+    "projection_measurement": {
+      "measured": true,
+      "what": "Euclidean distance in EPSG:3976 divided by true great-circle distance, for a 20 km step",
+      "scale_factor_by_latitude": {
+        "-49.60": 1.10182, "-55.00": 1.0679, "-60.00": 1.04188,
+        "-65.00": 1.02056, "-70.00": 1.00357, "-75.00": 0.99062,
+        "-77.90": 0.98487
+      },
+      "conclusion": "EPSG:3976 is polar stereographic with its standard parallel at 70S, so projected metres are stretched north of it and compressed south of it. Over the actual moved-iceberg latitude band (-76.96 to -60.04) a kilometre of ground is 0.987 to 1.042 projected kilometres, so a Euclidean radius test would be wrong by up to about 4%. The projection is therefore used ONLY to locate an over-inclusive window of candidate cells; every distance that decides an exposure value is a true great-circle distance."
+    },
+    "window_safety_scale": 1.25,
+    "window_extra_cells": 3,
+    "window_note": "half-width = ceil(radius_m * local_scale * window_safety_scale / cell_size_m) + window_extra_cells. Deliberately generous: a cell wrongly included is rejected by the exact great-circle test, while a cell wrongly excluded would be a silent hole in the cone."
+  },
+  "grid": {
+    "epsg": 3976,
+    "source": "src.data.preprocess_currents.target_grid()",
+    "geometry_cache": "data/processed/currents/_grid_geometry_3976_1328x1264.npz",
+    "note": "shape, transform and per-cell lat/lon are read from the project's existing helpers; none of them is restated here"
+  },
+  "horizons_hours": [6.0, 12.0, 24.0, 48.0],
+  "forecast_start_date": null,
+  "forecast_start_date_note": "null means the latest start date present in the moved population. Any date with moved observations may be named instead.",
+  "population": {
+    "source": "clean 24 h observed->observed MOVED rows, via iceberg_ml_residual.build_population",
+    "moved_only": true,
+    "uses_ml_residual_model": false,
+    "uses_iceberg_size": false,
+    "size_note": "iceberg size is deliberately not used. It is present on only ~10% of the moved rows and was excluded from the physics model for that reason; letting it into the exposure radius here would reintroduce it through the back door."
+  },
+  "output": {
+    "dtype": "float32",
+    "zero_means": "no modeled iceberg exposure at this cell",
+    "nodata": null,
+    "nodata_note": "the rasters carry NO nodata value on purpose. 0 is a real measurement meaning 'no modeled exposure', and must never be confused with 'no iceberg data here'. Coverage of the iceberg population is recorded in the raster tags and in the evaluation JSON instead.",
+    "no_hard_mask": true,
+    "no_hard_mask_note": "this layer produces no blocked/no-go/navigable mask. Hard constraints belong to NavigationDomain and constraints.py."
+  },
+  "limits": {
+    "max_icebergs": 5000,
+    "max_radius_km": 500.0
+  },
+  "known_limitations": [
+    "The exposure index is not a probability. A cell with exposure 0.8 is not 80% likely to contain ice; it is 80% of the way from the edge of one cone to its predicted centre.",
+    "Exposure 0 means no MODELED exposure from the icebergs in this forecast. It does not mean the water is clear: only 37 distinct icebergs have clean moved observations in this dataset, all from ASCAT, and any iceberg outside that population is invisible to this layer.",
+    "Horizons above 24 h use an extrapolated uncertainty radius and are flagged as such on every record.",
+    "The predicted centre beyond the step's own elapsed time carries the frozen model's constant-velocity assumption further than it was measured; the environment is sampled once at the forecast start and is not re-read.",
+    "One cell is 6250 m across while the 24 h radius is about 18 km, so a cone is only a few cells wide. The exposure surface is coarse by construction.",
+    "The ML residual model is not used: it measured worse than the physics baseline on the held-out moved 24 h rows."
+  ],
+  "not_included": [
+    "collision probability", "navigation cost integration", "A*",
+    "route selection", "Pareto routes", "replanning", "machine learning",
+    "any new uncertainty calibration", "any hard navigability mask"
+  ]
+}
