@@ -327,22 +327,32 @@ def test_repeated_generation_is_deterministic():
 def test_the_comparison_is_not_a_ranking_and_names_no_fuel():
     cmp = cached_corridor()
     code = E.code_strings_and_names(MODULE)
+    #  `fuel` is no longer forbidden here: fuel_efficient is a real objective
+    #  built on src/routing/fuel_cost.py. `bunker` and `consumption` stay
+    #  forbidden because this project cannot produce either quantity, and the
+    #  ranking vocabulary stays forbidden for the reason it always was.
     for banned in ("best", "best_route", "recommended", "recommended_route",
                    "rank", "ranking", "score", "winner", "optimal_route",
-                   "pareto", "dominates", "fuel", "bunker", "consumption",
-                   "safest"):
+                   "pareto", "dominates", "bunker", "consumption",
+                   "safest", "litre", "tonne"):
         assert banned not in code, f"{banned!r} appears in the module's code"
     assert "safest" not in MODULE.read_text().lower()
     assert cmp.provenance["this_is_not_a_ranking"] is True
+    #  distance is still not fuel -- now that a fuel figure exists, saying so
+    #  matters more, not less
     assert cmp.provenance["shortest_distance_is_a_fuel_figure"] is False
     assert OBJECTIVES[PROFILE_SHORTEST]["is_a_fuel_or_consumption_figure"] is False
     t = cmp.table()
     assert "not a ranking" in t and "NOT a fuel" in t
     d = cmp.to_dict()
+    #  this corridor comparison supplies no sea-ice field, so it is still the
+    #  three original profiles and the fuel objective is absent by design
     assert set(d["profiles"]) == set(PROFILES)
+    assert d["provenance"]["estimated_fuel_available"] is False
     assert set(d) == {"profiles", "shared_inputs", "provenance", "objectives"}
-    return ("no ranking, recommendation, Pareto or fuel vocabulary in the code; "
-            "the comparison states plainly that distance is not fuel")
+    return ("no ranking, recommendation, Pareto, bunker or consumption "
+            "vocabulary in the code; the comparison states plainly that "
+            "distance is not fuel, and offers no fuel figure without a field")
 
 
 def test_the_comparison_carries_every_required_metric():

@@ -22,7 +22,10 @@ export interface ForecastFrame {
   tracks: VectorSource
 }
 
-const toProjected = (lon: number, lat: number): [number, number] =>
+/** lon/lat degrees to the project CRS's metres. The one place the frontend
+ *  does this conversion; the camera reuses it so a forecast frame is built
+ *  from the same coordinates the forecast layer draws. */
+export const projectLonLat = (lon: number, lat: number): [number, number] =>
   proj4('EPSG:4326', PROJECT_PROJ4, [lon, lat]) as [number, number]
 
 export function buildForecastFrame(
@@ -37,10 +40,10 @@ export function buildForecastFrame(
   for (const record of records) {
     const state = resolveState(record, hours)
     if (!state) continue
-    const here = toProjected(state.longitude, state.latitude)
+    const here = projectLonLat(state.longitude, state.latitude)
 
     if (record.observed) {
-      const start = toProjected(
+      const start = projectLonLat(
         record.observed.longitude,
         record.observed.latitude,
       )

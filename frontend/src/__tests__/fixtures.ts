@@ -80,6 +80,50 @@ const profile = (
   temporal_provenance: {},
   constraint_summary: {},
   polaris: { selected: false },
+  //  additive, and an ESTIMATE in open-water-equivalent metres
+  estimated_fuel: 416429.44,
+  estimated_fuel_units: 'open_water_equivalent_metres',
+  estimated_fuel_per_km: 2339.09,
+  fuel_provenance: {
+    model: 'relative_ice_resistance_fuel_proxy',
+    version: '1.0.0',
+    status: 'estimated',
+    is_a_measured_fuel_consumption: false,
+    is_an_operational_fuel_prediction: false,
+    units: 'open_water_equivalent_metres',
+    unit_definition:
+      '1 open-water-equivalent metre = the fuel used steaming 1 m in ice-free water at the reference speed; that quantity is never resolved into a mass or volume',
+    equation: 'sum over segments of dist * 0.5 * (factor(A) + factor(B))',
+    edge_rule: 'the trapezoid rule src/routing/time_astar.py documents',
+    sic_sampled_at: 'the vessel arrival time at each cell',
+    parameters: {
+      open_water_factor: 1,
+      ice_penalty: 2,
+      ice_exponent: 1.5,
+      reference_speed_mps: 5,
+      absolute_rate: null,
+    },
+    parameter_status: {
+      open_water_factor: 'definition (the output unit)',
+      ice_penalty: 'project assumption, not measured',
+      ice_exponent: 'project assumption, not measured',
+      reference_speed_mps: 'project assumption',
+      absolute_rate: 'unavailable',
+    },
+    environmental_terms_used: ['sea_ice_concentration'],
+    environmental_terms_excluded: ['currents', 'wind', 'iceberg exposure'],
+    vessel_data_available: {
+      ice_class: 'PC6',
+      speed_mps: 5,
+      installed_power: null,
+      sfoc: null,
+    },
+    no_absolute_figure_reason:
+      'an absolute fuel figure needs installed power, an SFOC curve, displacement, hull/ice resistance and propulsive efficiency; none is in this repository',
+    suitable_for_relative_route_comparison: true,
+    suitable_for_operational_fuel_prediction: false,
+    comparable_only_within: 'routes priced with these same parameters',
+  },
   ...over,
 }) as unknown as RouteProfile
 
@@ -118,6 +162,20 @@ export function missionResponse(
     comparison: {
       profiles: {
         fastest: profile('fastest'),
+        fuel_efficient: profile('fuel_efficient', {
+          //  a genuinely different geometry: the fuel objective takes a
+          //  LONGER path to spend less estimated fuel, so it must not share
+          //  the distance route's cells in the fixture either
+          path: [[948, 503], [936, 500], [922, 497]],
+          objective: 'the estimated relative fuel proxy',
+          objective_units: 'open_water_equivalent_metres',
+          objective_value: 335683.06,
+          distance_km: 202.4,
+          travel_time_h: 11.24,
+          configured_cost: 15545819.9,
+          estimated_fuel: 335683.06,
+          estimated_fuel_per_km: 1658.5,
+        }),
         risk_oriented: profile('risk_oriented', {
           objective: 'the configured navigation cost',
           objective_units: 'configured cost units',
@@ -130,6 +188,22 @@ export function missionResponse(
           iceberg_exposure_contribution: 26476,
           special_consideration_cells: 18,
           indeterminate_cells: 14,
+          //  the real demo returns a different corridor for this objective --
+          //  28 cells against 27, 186.87 km against 178.03 -- so the recorded
+          //  payload carries its own cell sequence here, trimmed the same way
+          path: [[948, 503], [935, 501], [922, 497]],
+          cells: [
+            cell(948, 503),
+            cell(935, 501, {
+              arrival_time: 18_000,
+              arrival_datetime: '2025-01-08T05:00:00',
+            }),
+            cell(922, 497, {
+              bucket: 1,
+              arrival_time: 37_374.4,
+              arrival_datetime: '2025-01-08T10:22:54',
+            }),
+          ],
         }),
         shortest_distance: profile('shortest_distance', {
           objective: 'travelled distance',
@@ -147,9 +221,16 @@ export function missionResponse(
         polaris_riv_table: '1.3',
         iceberg_exposure_weight: 5,
         fastest_and_shortest_distance_coincided: true,
+        why_they_can_coincide:
+          'time_astar advances the clock by dist / vessel_speed_mps, so with ' +
+          "a single constant vessel speed a path's travel time is a strictly " +
+          'increasing function of its length and the two objectives order ' +
+          'every path identically. They separate once the speed stops being ' +
+          'one constant.',
       },
       objectives: {
         fastest: {},
+        fuel_efficient: {},
         risk_oriented: {},
         shortest_distance: {},
       },
@@ -256,6 +337,19 @@ export function simulationResponse(): SimulationResponse {
           polaris_contribution: entry(15_227_476, 15_227_476),
           special_consideration_cells: entry(23, 23),
         },
+        fuel_efficient: {
+          path_changed: true,
+          routed_before: true,
+          routed_after: true,
+          cells_with_simulated_exposure: 2,
+          distance_m: entry(202_405, 210_100),
+          travel_time_s: entry(40_481, 42_020),
+          configured_cost: entry(15_545_820, 15_602_000),
+          iceberg_exposure_contribution: entry(21_004, 44_180),
+          max_iceberg_exposure: entry(0.68, 0.92),
+          polaris_contribution: entry(15_227_476, 15_227_476),
+          special_consideration_cells: entry(21, 21),
+        },
         risk_oriented: {
           path_changed: true,
           routed_before: true,
@@ -287,6 +381,10 @@ export function simulationResponse(): SimulationResponse {
         is_a_collision_probability: false,
         guarantees_avoidance: false,
         ranks_the_routes: false,
+        note:
+          'the replanned route is the one that minimises the same configured ' +
+          'cost under one added simulated iceberg. It is not a claim that any ' +
+          'route avoids anything.',
       },
     },
   }
@@ -294,7 +392,9 @@ export function simulationResponse(): SimulationResponse {
 
 
 // A RECORDED GET /api/forecast/icebergs response, captured from a real run and
-// trimmed to two of the eleven icebergs. Every horizon, position and radius
+// trimmed to four of the eleven icebergs -- two near the demo mission and two
+// on the far side of the continent, in the backend's own id order, so a test
+// can tell mission relevance apart from array position. Every horizon, position and radius
 // below is the backend's own output; nothing here was computed in the frontend.
 export function forecastResponse(): ForecastResponse {
   return {
@@ -443,6 +543,150 @@ export function forecastResponse(): ForecastResponse {
             "interpolation_quality": "observed_to_observed"
           }
         ]
+      },
+      {
+        "iceberg_id": "b22g",
+        "position_source": "ascat",
+        "forecast_start_date": "2025-01-08",
+        "observed": {
+          "hours": 0.0,
+          "label": "Observed",
+          "latitude": -74.5148,
+          "longitude": -139.4598,
+          "radius_km": 0.0,
+          "extrapolated_uncertainty": false,
+          "physics_position_is_extrapolated": false,
+          "growth_law": "power",
+          "calibration_quantile": 0.9,
+          "calibration_n": 1197,
+          "interpolation_quality": "observed_to_observed"
+        },
+        "predicted": [
+          {
+            "hours": 6.0,
+            "label": "Predicted +6h",
+            "latitude": -74.50734045717347,
+            "longitude": -139.49443485602558,
+            "radius_km": 9.05052989739592,
+            "extrapolated_uncertainty": false,
+            "physics_position_is_extrapolated": false,
+            "growth_law": "power",
+            "calibration_quantile": 0.9,
+            "calibration_n": 1197,
+            "interpolation_quality": "observed_to_observed"
+          },
+          {
+            "hours": 12.0,
+            "label": "Predicted +12h",
+            "latitude": -74.49988091434695,
+            "longitude": -139.52905344403172,
+            "radius_km": 12.799382127560488,
+            "extrapolated_uncertainty": false,
+            "physics_position_is_extrapolated": false,
+            "growth_law": "power",
+            "calibration_quantile": 0.9,
+            "calibration_n": 1197,
+            "interpolation_quality": "observed_to_observed"
+          },
+          {
+            "hours": 24.0,
+            "label": "Predicted +24h",
+            "latitude": -74.4849618286939,
+            "longitude": -139.59824186357005,
+            "radius_km": 18.10105979479184,
+            "extrapolated_uncertainty": false,
+            "physics_position_is_extrapolated": false,
+            "growth_law": "power",
+            "calibration_quantile": 0.9,
+            "calibration_n": 1197,
+            "interpolation_quality": "observed_to_observed"
+          },
+          {
+            "hours": 48.0,
+            "label": "Predicted +48h",
+            "latitude": -74.4551236573878,
+            "longitude": -139.73642400920127,
+            "radius_km": 25.598764255120976,
+            "extrapolated_uncertainty": true,
+            "physics_position_is_extrapolated": true,
+            "growth_law": "power",
+            "calibration_quantile": 0.9,
+            "calibration_n": 1197,
+            "interpolation_quality": "observed_to_observed"
+          }
+        ]
+      },
+      {
+        "iceberg_id": "b47",
+        "position_source": "ascat",
+        "forecast_start_date": "2025-01-08",
+        "observed": {
+          "hours": 0.0,
+          "label": "Observed",
+          "latitude": -74.91,
+          "longitude": -149.26,
+          "radius_km": 0.0,
+          "extrapolated_uncertainty": false,
+          "physics_position_is_extrapolated": false,
+          "growth_law": "power",
+          "calibration_quantile": 0.9,
+          "calibration_n": 1197,
+          "interpolation_quality": "observed_to_observed"
+        },
+        "predicted": [
+          {
+            "hours": 6.0,
+            "label": "Predicted +6h",
+            "latitude": -74.912048127862,
+            "longitude": -149.29299057790485,
+            "radius_km": 9.05052989739592,
+            "extrapolated_uncertainty": false,
+            "physics_position_is_extrapolated": false,
+            "growth_law": "power",
+            "calibration_quantile": 0.9,
+            "calibration_n": 1197,
+            "interpolation_quality": "observed_to_observed"
+          },
+          {
+            "hours": 12.0,
+            "label": "Predicted +12h",
+            "latitude": -74.91409625572399,
+            "longitude": -149.3259855301369,
+            "radius_km": 12.799382127560488,
+            "extrapolated_uncertainty": false,
+            "physics_position_is_extrapolated": false,
+            "growth_law": "power",
+            "calibration_quantile": 0.9,
+            "calibration_n": 1197,
+            "interpolation_quality": "observed_to_observed"
+          },
+          {
+            "hours": 24.0,
+            "label": "Predicted +24h",
+            "latitude": -74.91819251144798,
+            "longitude": -149.39198856118958,
+            "radius_km": 18.10105979479184,
+            "extrapolated_uncertainty": false,
+            "physics_position_is_extrapolated": false,
+            "growth_law": "power",
+            "calibration_quantile": 0.9,
+            "calibration_n": 1197,
+            "interpolation_quality": "observed_to_observed"
+          },
+          {
+            "hours": 48.0,
+            "label": "Predicted +48h",
+            "latitude": -74.92638502289597,
+            "longitude": -149.52404715491195,
+            "radius_km": 25.598764255120976,
+            "extrapolated_uncertainty": true,
+            "physics_position_is_extrapolated": true,
+            "growth_law": "power",
+            "calibration_quantile": 0.9,
+            "calibration_n": 1197,
+            "interpolation_quality": "observed_to_observed"
+          }
+        ]
       }
     ],
     "iceberg_count": 11,
@@ -501,4 +745,39 @@ export function forecastResponse(): ForecastResponse {
       "population_note": "clean observed-to-observed MOVED rows, ASCAT only; any other iceberg is invisible to this forecast"
     }
   } as unknown as ForecastResponse
+}
+
+
+// The RECORDED GET /api/mission/defaults payload: the demonstration's own
+// inputs, as the backend publishes them. The app seeds its form from these
+// rather than carrying a date of its own.
+export function missionDefaults(): { demo: Record<string, unknown> } {
+  return {
+    demo: {
+      "environment_date": "2025-01-08",
+      "departure_time": "2025-01-08T00:00:00",
+      "start": [
+        948,
+        503
+      ],
+      "goal": [
+        922,
+        497
+      ],
+      "vessel_speed_mps": 5.0,
+      "polaris_ice_class": "PC6",
+      "polaris_riv_table": "1.3",
+      "exposure_horizons": [
+        [
+          "06h",
+          0
+        ],
+        [
+          "12h",
+          1
+        ]
+      ],
+      "bucket_hours": 6
+    },
+  }
 }

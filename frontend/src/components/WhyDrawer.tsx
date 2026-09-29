@@ -1,13 +1,14 @@
 import { PROFILE_LABEL } from '../api/types'
-import type { Comparison, ProfileName, SimulationResponse } from '../api/types'
+import type { Comparison, ProfileName } from '../api/types'
 import { buildFindings, identicalTo } from './findings'
 import { count, exposure, num } from './format'
-import WhyRouteChanged from './WhyRouteChanged'
 
 interface Props {
   comparison: Comparison
   profile: ProfileName
-  simulation: SimulationResponse | null
+  /** which exposure fields priced this route, and how far the forecast runs
+   *  past them; from map/pricedHorizon.ts */
+  pricedSummary: string | null
   open: boolean
   onClose: () => void
 }
@@ -16,7 +17,7 @@ interface Props {
 export default function WhyDrawer({
   comparison,
   profile,
-  simulation,
+  pricedSummary,
   open,
   onClose,
 }: Props) {
@@ -67,6 +68,12 @@ export default function WhyDrawer({
           </div>
         </dl>
 
+        {pricedSummary && (
+          <p className="why-note" data-testid="why-priced-horizon">
+            {pricedSummary}
+          </p>
+        )}
+
         {findings.length > 0 ? (
           <ul className="findings">
             {findings.map((finding) => (
@@ -88,10 +95,6 @@ export default function WhyDrawer({
             the same path: with one constant vessel speed, travel time is a
             strictly increasing function of path length.
           </p>
-        )}
-
-        {simulation && (
-          <WhyRouteChanged simulation={simulation} profile={profile} />
         )}
       </div>
     </aside>

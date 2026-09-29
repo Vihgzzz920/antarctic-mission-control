@@ -82,7 +82,21 @@ class ForecastUnavailable(TimeCostError):
 
 @dataclass(frozen=True)
 class ComposedField:
-    """One bucket's composed cost, with the provenance that justifies its date."""
+    """One bucket's composed cost, with the provenance that justifies its date.
+
+    `environment_date` is the date of the ANALYSIS this field is issued from --
+    the same quantity the iceberg layer matches its forecast_start_date
+    against. It is not necessarily the valid time of the bucket: a bucket four
+    hours after departure is priced from the departure-day analysis unless the
+    caller resolved a different field for it.
+
+    `environment` optionally carries that resolution, as
+    src.api.environment_timeline.BucketEnvironment.to_dict(): which raster was
+    actually read for this bucket, the window it is valid for, and whether
+    anything was carried forward. It is provenance only -- no lookup, cost or
+    refusal in this module reads it -- and an empty dict simply means the
+    caller did not record one.
+    """
 
     bucket: int
     composition: GridComposition
@@ -92,6 +106,7 @@ class ComposedField:
     shape: tuple[int, int]
     transform: tuple[float, ...]
     label: str = ""
+    environment: dict = dc_field(default_factory=dict)
 
     def cost(self, branch: str) -> np.ndarray:
         if branch == "conservative":
@@ -278,7 +293,8 @@ class TimeIndexedNavigationCost:
             "fields": {f.bucket: {"label": f.label,
                                   "environment_date": str(f.environment_date),
                                   "chart_date": str(f.chart_date),
-                                  "dates_aligned": f.dates_aligned}
+                                  "dates_aligned": f.dates_aligned,
+                                  "environment": dict(f.environment)}
                        for f in self.fields.values()},
             "lookups": dict(self.lookups),
         }

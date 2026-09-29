@@ -36,3 +36,24 @@ export function timestamp(iso: string | null | undefined): string {
   if (!iso) return EMPTY
   return iso.replace('T', ' ').slice(0, 19) + 'Z'
 }
+
+/**
+ * The estimated fuel proxy, in open-water-equivalent metres.
+ *
+ * OWE-m is a RELATIVE index: one unit is the fuel used steaming one metre in
+ * ice-free water at the reference speed. It is never rendered as a volume or a
+ * mass, because this project holds no engine, consumption, displacement or
+ * efficiency data with which to resolve one.
+ */
+export function owe(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value))
+    return EMPTY
+  return `${num(value)} OWE-m`
+}
+
+/** Mean route difficulty: open-water-equivalent metres per kilometre travelled. */
+export function owePerKm(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value))
+    return EMPTY
+  return `${num(value)} OWE-m/km`
+}

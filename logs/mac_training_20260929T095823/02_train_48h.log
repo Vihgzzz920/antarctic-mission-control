@@ -1,0 +1,48 @@
+==========================================================================
+HistGradientBoostingRegressor  --  features(t) -> SIC(t+2)   [+48 h lead]
+==========================================================================
+  dataset  : forecast_dataset_48h.npz
+  lead     : +48 h (2 day(s)) -- requested and confirmed against the dataset (recorded by the dataset builder (lead_hours))
+  features : sic_t, current_u_t, current_v_t, current_speed_t
+  leakage  : PASSED -- every feature is the origin step; the target is a separate array exactly one lead later. No future input enters training.
+  seed     : 42
+  artifact : forecast_model_hgb_48h.joblib   metrics: forecast_metrics_48h.json
+
+Stratified training sample (on sic_t):
+  ice   pool   52,525,229   take  1,000,000   (85.27% of train)
+  miz   pool    7,924,984   take    500,000   (12.87% of train)
+  open  pool    1,148,805   take    500,000   ( 1.86% of train)
+  sample   : X (2000000, 4) float32, y (2000000,)
+  NOTE     : this sample is deliberately NOT the natural class mix; val/test below are.
+
+Fitting on 2,000,000 rows ...
+Binning 0.058 GB of training data: 0.057 s
+Binning 0.006 GB of validation data: 0.004 s
+Fitting gradient boosted rounds:
+Fit 108 trees in 2.283 s, (3348 total leaves)
+Time spent computing histograms: 0.801s
+Time spent finding best splits:  0.181s
+Time spent applying splits:      0.657s
+Time spent predicting:           0.130s
+  iterations used: 108 of 200
+
+Scoring val: 21,599,825 rows (full split, in order) ...
+
+Scoring test: 6,314,231 rows (full split, in order) ...
+
+=========================================================================================
+model       split        MAE     RMSE       R2   MIZ MAE  open MAE  ice MAE             n
+-----------------------------------------------------------------------------------------
+hgb         val        8.990   15.371   0.3802    23.339    56.140    5.447    21,599,825
+persistence val        9.383   16.887   0.2519    24.805    39.237    6.003    21,599,825
+hgb         test      13.468   21.326   0.3914    24.243    54.539    6.095     6,314,231
+persistence test      12.950   21.826   0.3625    24.489    35.979    6.506     6,314,231
+=========================================================================================
+  val: HGB beats persistence by +0.393 pp overall, +1.467 pp in the MIZ  (positive = HGB better)
+  test: HGB beats persistence by -0.518 pp overall, +0.246 pp in the MIZ  (positive = HGB better)
+
+The MIZ column is the one that matters. Overall MAE is dominated by consolidated
+ice, where persistence is already near-perfect and any model looks good.
+
+GOT     forecast_model_hgb_48h.joblib  (0.4 MB)
+GOT     forecast_metrics_48h.json

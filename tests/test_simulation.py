@@ -263,16 +263,26 @@ def test_the_simulation_is_labelled_as_one_everywhere():
     #  "is_a_collision_probability": false is the opposite of a claim. So the
     #  check is on what the response asserts: no banned wording in any string
     #  VALUE, and every key naming one of those ideas must be false.
+    #  `fuel_efficient` is now a real objective (src/routing/fuel_cost.py), so
+    #  the word itself is no longer forbidden -- what stays forbidden is any
+    #  UNSUPPORTED fuel claim: a measured consumption, an operational
+    #  prediction, a saving, or a mass or volume this project cannot produce.
     banned = ("safest", "collision probability", "guaranteed avoidance",
-              "fuel-efficient", "best route")
+              "best route", "measured fuel", "actual fuel", "fuel saving",
+              "saves fuel", "litres of fuel", "tonnes of fuel", "bunker")
+    #  keys that ASSERT one of these ideas must be false. `fuel` alone is no
+    #  longer such a key, so only the claim-shaped fuel keys are checked.
+    claim_keys = ("safest", "collision", "guarantee",
+                  "is_a_measured_fuel", "is_an_operational_fuel",
+                  "fuel_is_measured", "fuel_is_an_operational",
+                  "suitable_for_operational")
     offenders: list[str] = []
 
     def walk(node, path="$"):
         if isinstance(node, dict):
             for key, value in node.items():
                 low = key.lower()
-                if any(word in low for word in
-                       ("safest", "collision", "fuel", "guarantee")):
+                if any(word in low for word in claim_keys):
                     if value is not False:
                         offenders.append(f"{path}.{key} = {value!r}")
                 walk(value, f"{path}.{key}")

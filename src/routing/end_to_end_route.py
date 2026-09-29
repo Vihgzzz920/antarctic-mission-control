@@ -622,6 +622,28 @@ def _temporal_provenance(provider, *, departure_time: datetime, t0: float,
         "override_is_never_the_default": True,
         "provider_provenance": prov,
     }
+
+    #  Which environmental field each bucket was actually built from, when the
+    #  caller recorded one (src.api.environment_timeline). Read-only: nothing
+    #  here validates, selects or substitutes a field, and a provider that
+    #  recorded nothing simply reports that it did not.
+    by_bucket = {int(b): dict(v.get("environment") or {})
+                 for b, v in fields.items()}
+    recorded = {b: e for b, e in by_bucket.items() if e}
+    out["environment_provenance_recorded"] = bool(recorded)
+    if recorded:
+        field_dates = sorted({e["environment_date"] for e in recorded.values()})
+        out["environment_by_bucket"] = by_bucket
+        out["environment_policies"] = sorted(
+            {e["policy"] for e in recorded.values()})
+        #  the honest headline: did the priced environment change with the
+        #  arrival time, or was one field served to every bucket?
+        out["environment_field_dates"] = field_dates
+        out["environment_is_time_varying"] = len(field_dates) > 1
+        out["environment_persisted_buckets"] = sorted(
+            b for b, e in recorded.items() if e.get("persisted"))
+        out["environment_uses_future_observations"] = any(
+            e.get("uses_future_observation") for e in recorded.values())
     if isinstance(provider, IcebergTimeNavigationCost):
         out["iceberg_exposure_weight"] = prov["iceberg_exposure_weight"]
         out["iceberg_weight_is_a_project_routing_parameter"] = True

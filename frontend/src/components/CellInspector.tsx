@@ -27,8 +27,15 @@ export default function CellInspector({ cell, onClose }: Props) {
 
   const secondary: Array<[string, string]> = [
     ['Time bucket', String(cell.bucket)],
+    ['Dominant source', cell.iceberg_id ?? 'none'],
+    [
+      'Exposure field',
+      cell.forecast_horizon_hours === null ||
+      cell.forecast_horizon_hours === undefined
+        ? 'no modelled exposure here'
+        : `+${cell.forecast_horizon_hours}h`,
+    ],
     ['Environmental', num(cell.environmental_cost, 2)],
-    ['Dominant iceberg', cell.iceberg_id ?? 'none'],
     ['Chart state', (cell.chart_state ?? EMPTY).replace(/_/g, ' ')],
     [
       'Dominant fraction',

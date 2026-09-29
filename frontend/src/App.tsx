@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ApiError,
   compareMission,
+  getDefaults,
   getHealth,
   getIcebergExposure,
   getIcebergForecast,
@@ -26,22 +27,46 @@ import ForecastTimeline from './components/ForecastTimeline'
 import MapLegend from './components/MapLegend'
 import MissionDrawer from './components/MissionDrawer'
 import PlanDock from './components/PlanDock'
+import RoutingGate from './components/RoutingGate'
 import SelectedRouteBar from './components/SelectedRouteBar'
-import SimulationControl from './components/SimulationControl'
+import RespondDock from './components/RespondDock'
+import RespondDrawer from './components/RespondDrawer'
 import TopBar from './components/TopBar'
 import type { Stage } from './components/TopBar'
 import TransitControl from './components/TransitControl'
 import WhyDrawer from './components/WhyDrawer'
+import { resolveCameraPlan } from './map/camera'
+import type { CameraStage, XY } from './map/camera'
+import { buildProvenance, routingReadiness } from './api/provenance'
+import { drawnProfiles, groupEquivalentRoutes } from './api/routeEquivalence'
+import type { RoutingReadiness } from './api/provenance'
+import { visibleLayers, legendEntries } from './map/layerContract'
+import {
+  UNPRICED,
+  exposureFields,
+  pricedHorizonSummary,
+  resolvePricedHorizon,
+} from './map/pricedHorizon'
+import type { LegendContext } from './map/layerContract'
+import { PROFILE_COLOUR } from './map/layers'
 import { cellCentreXY } from './map/coords'
-import { crsMatchesBackend } from './map/crs'
+import { injectionPoint } from './map/injection'
+import { defaultForecastSubject } from './map/subject'
+import type { MissionCorridor } from './map/subject'
+import { crsMatchesBackend, GRID_EXTENT } from './map/crs'
+import { projectLonLat } from './map/ForecastLayers'
 import { transitSeconds, vesselAt } from './map/forecast'
 import MissionMap from './map/MissionMap'
 
 // The form's opening values only. Every metric on screen comes from the API.
+// The form's opening values only, and no date among them: the demonstration's
+// own departure time is a backend fact, fetched from /api/mission/defaults
+// below. Until it arrives the field is empty and routing is refused rather
+// than run against a date invented here.
 const INITIAL_REQUEST: MissionRequest = {
   start: [948, 503],
   goal: [922, 497],
-  departure_time: '2025-01-08T00:00:00',
+  departure_time: '',
   vessel_speed_mps: 5,
   polaris_ice_class: 'PC6',
   polaris_riv_table: '1.3',
@@ -75,9 +100,24 @@ export default function App() {
   const [hours, setHours] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
-  const [subject, setSubject] = useState<string | null>(null)
+  //  null until the operator picks one in the panel; the default below
+  //  fills in until then
+  const [pickedSubject, setPickedSubject] = useState<string | null>(null)
 
   const [whyOpen, setWhyOpen] = useState(false)
+  const [provenanceOpen, setProvenanceOpen] = useState(false)
+  const [changeOpen, setChangeOpen] = useState(false)
+  //  plan() is declared before the provenance it must respect, so it reads the
+  //  current readiness through this mirror rather than a stale closure
+  const readinessRef = useRef<RoutingReadiness>({
+    state: 'unknown',
+    canRoute: true,
+    gated: false,
+    headline: 'Provenance unknown',
+    detail: null,
+    action: 'route',
+    actionLabel: 'Use forecast for routing',
+  })
   const [transitPlaying, setTransitPlaying] = useState(false)
   const [transitSecond, setTransitSecond] = useState(0)
 
@@ -95,8 +135,49 @@ export default function App() {
         setHealthError(null)
       })
       .catch((cause: ApiError) => live && setHealthError(cause))
+    //  the demonstration's own inputs, so no date is written into this app
+    getDefaults()
+      .then(({ demo }) => {
+        if (!live || !demo) return
+        setRequest((current) => ({
+          ...current,
+          start: Array.isArray(demo.start)
+            ? (demo.start as [number, number])
+            : current.start,
+          goal: Array.isArray(demo.goal)
+            ? (demo.goal as [number, number])
+            : current.goal,
+          departure_time:
+            typeof demo.departure_time === 'string'
+              ? demo.departure_time
+              : current.departure_time,
+          vessel_speed_mps:
+            typeof demo.vessel_speed_mps === 'number'
+              ? demo.vessel_speed_mps
+              : current.vessel_speed_mps,
+          polaris_ice_class:
+            typeof demo.polaris_ice_class === 'string'
+              ? demo.polaris_ice_class
+              : current.polaris_ice_class,
+          polaris_riv_table:
+            typeof demo.polaris_riv_table === 'string'
+              ? demo.polaris_riv_table
+              : current.polaris_riv_table,
+        }))
+      })
+      .catch(() => undefined)
     getIcebergExposure(EXPOSURE_BUCKET)
       .then((collection) => live && setExposure(collection as GeoJsonCollection))
+      .catch(() => undefined)
+    //  OBSERVE shows the iceberg observations themselves, so the forecast is
+    //  fetched with the rest of the environment rather than on the way into
+    //  the next stage. Start forecast then has nothing left to wait for.
+    getIcebergForecast()
+      .then((response) => {
+        //  only a payload that actually carries icebergs is a forecast; a
+        //  half-answer is left alone rather than half-drawn
+        if (live && Array.isArray(response?.icebergs)) setForecast(response)
+      })
       .catch(() => undefined)
     return () => {
       live = false
@@ -116,7 +197,6 @@ export default function App() {
     try {
       const response = forecast ?? (await getIcebergForecast())
       setForecast(response)
-      setSubject((current) => current ?? response.icebergs[0]?.iceberg_id ?? null)
       setHours(0)
       go('forecast')
     } catch (cause) {
@@ -131,6 +211,24 @@ export default function App() {
   }, [forecast, go])
 
   const plan = useCallback(async () => {
+    if (!readinessRef.current.canRoute) {
+      //  the pairing the backend refuses. The gate is already on screen; this
+      //  is the guard behind it, so no request is spent discovering it.
+      return
+    }
+    if (!request.departure_time) {
+      //  the demonstration's departure time has not arrived from the backend;
+      //  routing against a date invented here would be a fabrication
+      setError({
+        code: 'mission_defaults_unavailable',
+        message:
+          'The mission defaults have not arrived from the backend, so the ' +
+          'departure time is unknown. Nothing is assumed in its place: set a ' +
+          'departure time in the mission panel, or retry once the API responds.',
+      })
+      go('plan')
+      return
+    }
     setBusy(true)
     setError(null)
     setCell(null)
@@ -165,8 +263,9 @@ export default function App() {
     }
   }, [go, request])
 
+
   // ── forecast playback ──────────────────────────────────────────────────
-  const maxHours = forecast?.horizons.at(-1)?.hours ?? 48
+  const maxHours = forecast?.horizons?.at(-1)?.hours ?? 48
   const frame = useRef<number>(0)
   useEffect(() => {
     if (!playing) return
@@ -252,6 +351,8 @@ export default function App() {
         setSimulation(response)
         setTransitSecond(0)
         setTransitPlaying(false)
+        //  the evidence is the point of the stage: it opens with the result
+        setChangeOpen(true)
       } catch (cause) {
         setError(
           cause instanceof ApiError
@@ -265,8 +366,23 @@ export default function App() {
     [mission, request, selected],
   )
 
+  //  where a simulated iceberg goes when the operator asks for one ON the
+  //  route: a vertex of the path the search returned, ~40% along it. Pure and
+  //  repeatable; see map/injection.ts.
+  const injection = useMemo(
+    () => injectionPoint(route?.path, grid),
+    [grid, route?.path],
+  )
+
+  const injectOnRoute = useCallback(() => {
+    if (!injection) return
+    setPlacing(false)
+    void place(injection.position)
+  }, [injection, place])
+
   const clearSimulation = useCallback(() => {
     setSimulation(null)
+    setChangeOpen(false)
     setPlacing(false)
     setCell(null)
     setError(null)
@@ -276,34 +392,286 @@ export default function App() {
 
   // ── derived ────────────────────────────────────────────────────────────
   const online = Boolean(health && health.status === 'ok')
-  const historical = Boolean(mission?.historical_demonstration)
   const crsOk = useMemo(() => crsMatchesBackend(grid?.proj4), [grid?.proj4])
   const superseded =
     simulation && selected ? simulation.baseline.geojson[selected] ?? null : null
-  const exposureRadiusKm = useMemo(() => {
-    const layer = health?.exposure_layers?.find(
-      (entry) => Number(entry.bucket) === EXPOSURE_BUCKET,
-    )
-    const radius = layer ? Number(layer.radius_km) : NaN
-    return Number.isFinite(radius) ? radius : null
-  }, [health])
+  // ── the priced horizon ─────────────────────────────────────────────────
+  //  Which exposure fields exist at all (the routing configuration), and
+  //  which of them THIS route actually met (its own buckets_used). A forecast
+  //  horizon with no exposure field priced nothing, whatever the timeline can
+  //  display; see map/pricedHorizon.ts.
+  const fields = useMemo(
+    () => exposureFields(health?.exposure_layers),
+    [health],
+  )
+  const configuredPricedHours = useMemo(
+    () => [...new Set(fields.map((field) => field.hours))].sort((a, b) => a - b),
+    [fields],
+  )
+  const forecastHours = useMemo(
+    () => forecast?.horizons?.map((horizon) => horizon.hours) ?? [],
+    [forecast],
+  )
+  const priced = useMemo(() => {
+    const profile = shown && selected ? shown.comparison.profiles[selected] : null
+    if (!profile?.success) return UNPRICED
+    return resolvePricedHorizon(profile.buckets_used, fields, forecastHours)
+  }, [fields, forecastHours, selected, shown])
+  const pricedHorizonHours = priced.lastHours
+  const pricedSummary = priced === UNPRICED ? null : pricedHorizonSummary(priced)
+  //  the overlay is one field, fetched by bucket. It is drawn only when the
+  //  route was actually priced in that bucket -- otherwise it would sit beside
+  //  a route it had no part in pricing.
+  const drawnExposureField = useMemo(
+    () => fields.find((field) => field.bucket === EXPOSURE_BUCKET) ?? null,
+    [fields],
+  )
+  const exposureIsPriced =
+    drawnExposureField !== null && priced.buckets.includes(EXPOSURE_BUCKET)
 
+  //  the last horizon the uncertainty radius is calibrated to, from the
+  //  forecast payload's own horizon list
+  const calibratedToHours = useMemo(() => {
+    const calibrated = forecast?.horizons?.filter(
+      (horizon) => !horizon.extrapolated_uncertainty,
+    )
+    const last = calibrated?.at(-1)?.hours
+    return typeof last === 'number' ? last : null
+  }, [forecast])
+
+  // ── where the data came from ───────────────────────────────────────────
+  //  Assembled from /api/health, /api/forecast/icebergs and the mission that
+  //  ran, if one has. Available from the first paint; see api/provenance.ts.
+  const provenance = useMemo(
+    () =>
+      buildProvenance({
+        health,
+        forecast,
+        mission: shown,
+        configuredPricedHours,
+      }),
+    [configuredPricedHours, forecast, health, shown],
+  )
+
+  //  the routing gate: one switch, read here and edited in the mission panel
+  const readiness = useMemo(
+    () => routingReadiness(provenance, request.historical_demo_override),
+    [provenance, request.historical_demo_override],
+  )
+
+  useEffect(() => {
+    readinessRef.current = readiness
+  }, [readiness])
+
+  //  the pairing this app will not send, and the one the backend sent back
+  const backendRefusedPairing =
+    error?.code === 'historical_date_mismatch' ||
+    shown?.status === 'historical_date_mismatch'
+  const routingRefused = !readiness.canRoute || backendRefusedPairing
+  const refusalNote = backendRefusedPairing
+    ? (error?.message ?? shown?.message ?? null)
+    : null
+
+  //  RESPOND is only reachable once a route exists to respond with
+  const canRespond = Boolean(route)
+  const navigable = useMemo(
+    () => reached.filter((name) => name !== 'respond' || canRespond),
+    [canRespond, reached],
+  )
+  const respond = useCallback(() => {
+    setCell(null)
+    go('respond')
+  }, [go])
+
+  //  a route that goes away takes RESPOND with it
+  useEffect(() => {
+    if (stage === 'respond' && !canRespond) setStage('plan')
+  }, [canRespond, stage])
+
+  const enableHistoricalDemonstration = useCallback(() => {
+    //  the operator's own act; nothing switches itself
+    setRequest((current) => ({ ...current, historical_demo_override: true }))
+  }, [])
+
+  // ── the mission corridor ───────────────────────────────────────────────
+  //  departure to destination in projected metres, from the request's own
+  //  cells through the grid transform the API reported
+  const missionCorridor = useMemo<MissionCorridor | null>(() => {
+    if (!grid) return null
+    return {
+      start: cellCentreXY(grid, request.start[0], request.start[1]) as XY,
+      goal: cellCentreXY(grid, request.goal[0], request.goal[1]) as XY,
+    }
+  }, [grid, request.goal, request.start])
+
+  // ── which iceberg the forecast opens on ────────────────────────────────
+  //  Relevance to this mission, not the order the backend listed them in. An
+  //  explicit pick in the panel is held separately and always wins; clearing
+  //  it hands the choice back to the default.
+  const defaultSubject = useMemo(
+    () => defaultForecastSubject(forecast?.icebergs, missionCorridor),
+    [forecast?.icebergs, missionCorridor],
+  )
+  const activeSubject = pickedSubject ?? defaultSubject
   const subjectRecord =
-    forecast?.icebergs.find((berg) => berg.iceberg_id === subject) ?? null
+    forecast?.icebergs.find((berg) => berg.iceberg_id === activeSubject) ?? null
+
+  // ── where the map looks ────────────────────────────────────────────────
+  //  The stage asks for a frame; map/camera.ts works out the extent from the
+  //  geometry that is actually on hand -- the request's own cells, the paths
+  //  the search returned, the forecast's own states, the iceberg the
+  //  simulation placed. Nothing here is a fixed coordinate, and the plan is
+  //  keyed by its geometry, so re-rendering does not move the view.
+  //  one stage machine: the camera and the layer contract read the stage
+  //  itself, rather than inferring a fourth state from the simulation
+  const cameraStage: CameraStage = stage
+  //  PLAN and RESPOND draw iceberg states at the horizon the route was priced
+  //  at, never at a later one the routing configuration does not cover
+  const forecastClock =
+    cameraStage === 'plan' || cameraStage === 'respond'
+      ? pricedHorizonHours ?? hours
+      : hours
+  const profiles = shown?.comparison.profiles ?? null
+  const berg = simulation?.simulation ?? null
+
+  const cameraPlan = useMemo(() => {
+    const at = (cell: readonly number[]): XY | null =>
+      grid && cell.length >= 2
+        ? (cellCentreXY(grid, cell[0], cell[1]) as XY)
+        : null
+
+    const states = subjectRecord
+      ? [subjectRecord.observed, ...subjectRecord.predicted].filter(
+          (state): state is NonNullable<typeof state> => state !== null,
+        )
+      : []
+
+    const paths = profiles
+      ? PROFILE_ORDER.map((name) => profiles[name])
+          .filter((profile) => profile?.success && profile.path.length > 0)
+          .map((profile) =>
+            profile.path
+              .map((cell) => at(cell))
+              .filter((point): point is XY => point !== null),
+          )
+          .filter((path) => path.length > 0)
+      : []
+
+    const hazardCentre = berg ? at([berg.row, berg.col]) : null
+
+    return resolveCameraPlan({
+      stage: cameraStage,
+      gridExtent: GRID_EXTENT,
+      mission: missionCorridor,
+      subject:
+        subjectRecord && states.length > 0
+          ? {
+              id: subjectRecord.iceberg_id,
+              points: states.map((state) =>
+                projectLonLat(state.longitude, state.latitude),
+              ),
+              maxRadiusM:
+                Math.max(...states.map((state) => state.radius_km)) * 1000,
+            }
+          : null,
+      routes: paths.length > 0 ? paths : null,
+      hazard:
+        berg && hazardCentre
+          ? {
+              centre: hazardCentre,
+              radiusM: berg.radius_km * 1000,
+              encounter: at(berg.encounter_cell),
+            }
+          : null,
+    })
+  }, [berg, cameraStage, grid, missionCorridor, profiles, subjectRecord])
+
+  // ── what is on the map ─────────────────────────────────────────────────
+  //  One list, from map/layerContract.ts. The map adds a layer only if its id
+  //  is here, and the legend describes only the ids that are here, so a legend
+  //  row cannot announce something that was never drawn.
+  const routedProfiles = useMemo(
+    () =>
+      profiles
+        ? PROFILE_ORDER.filter((name) => profiles[name]?.success)
+        : [],
+    [profiles],
+  )
+
+  //  Which profiles came back with the SAME geometry. The three objectives are
+  //  three different questions, but under one constant vessel speed two of them
+  //  can be answered by the same path; that is measured from the returned cell
+  //  sequences rather than assumed. See api/routeEquivalence.ts.
+  const routeGroups = useMemo(() => groupEquivalentRoutes(profiles), [profiles])
+  //  one drawn line per distinct geometry, so a shared path is not stacked
+  //  twice on the map
+  const drawn = useMemo(
+    () => drawnProfiles(routeGroups, selected),
+    [routeGroups, selected],
+  )
+
+  const layers = useMemo(
+    () =>
+      visibleLayers({
+        stage: cameraStage,
+        hasForecast: (forecast?.icebergs?.length ?? 0) > 0,
+        hasExposure:
+          (exposure?.features?.length ?? 0) > 0 && exposureIsPriced,
+        routedProfiles: routedProfiles.length,
+        hasEndpoints: Boolean(shown?.endpoints),
+        hasSimulation: Boolean(simulation?.simulation),
+        hasVessel: Boolean(vesselXY),
+        pricedHorizonHours,
+      }),
+    [
+      cameraStage,
+      exposure,
+      exposureIsPriced,
+      forecast,
+      pricedHorizonHours,
+      routedProfiles.length,
+      shown,
+      simulation,
+      vesselXY,
+    ],
+  )
+
+  const legend = useMemo(() => {
+    const context: LegendContext = {
+      routedProfiles,
+      selectedProfile: selected,
+      profileColour: PROFILE_COLOUR,
+      pricedHorizonHours,
+      exposureFieldHours: drawnExposureField?.hours ?? null,
+      exposureIcebergCount: drawnExposureField?.icebergCount ?? null,
+      calibratedToHours: calibratedToHours,
+    }
+    return legendEntries(layers, context)
+  }, [
+    calibratedToHours,
+    drawnExposureField,
+    layers,
+    pricedHorizonHours,
+    routedProfiles,
+    selected,
+  ])
+
 
   return (
     <div className="app">
       <MissionMap
-        routes={stage === 'plan' ? shown?.geojson ?? null : null}
+        routes={shown?.geojson ?? null}
+        drawProfiles={drawn}
         endpoints={shown?.endpoints ?? null}
-        exposure={stage === 'observe' ? exposure : null}
-        exposureRadiusKm={exposureRadiusKm}
+        exposure={exposure}
         supersededRoute={superseded}
         simulatedExposure={simulation?.simulated_exposure ?? null}
         simulatedRadiusKm={simulation?.simulation?.radius_km ?? null}
-        forecastRecords={stage === 'observe' ? null : forecast?.icebergs ?? null}
-        forecastHours={hours}
+        forecastRecords={forecast?.icebergs ?? null}
+        forecastHours={forecastClock}
         vessel={vesselXY}
+        camera={cameraPlan}
+        layers={layers}
         placing={placing}
         onPlace={place}
         selected={selected}
@@ -312,50 +680,37 @@ export default function App() {
 
       <TopBar
         stage={stage}
-        reached={reached}
-        grid={grid}
+        reached={navigable}
         online={online}
-        historical={historical}
+        provenance={provenance}
+        provenanceOpen={provenanceOpen}
+        onProvenanceToggle={setProvenanceOpen}
         onGo={setStage}
       />
 
-      <MissionDrawer
-        value={request}
-        onChange={setRequest}
-        grid={grid}
-        busy={busy}
-      />
+      {stage !== 'respond' && (
+        <MissionDrawer
+          value={request}
+          onChange={setRequest}
+          grid={grid}
+          busy={busy}
+        />
+      )}
 
       {stage === 'forecast' && forecast && (
         <ForecastPanel
           forecast={forecast}
           hours={hours}
           record={subjectRecord}
-          onPick={setSubject}
+          onPick={setPickedSubject}
         />
       )}
 
-      {stage === 'plan' && (
-        <>
-          <CellInspector cell={cell} onClose={() => setCell(null)} />
-          {mission && selected && (
-            <SimulationControl
-              armed={placing}
-              active={Boolean(simulation)}
-              busy={simBusy}
-              disabled={!online}
-              onArm={() => setPlacing((current) => !current)}
-              onClear={clearSimulation}
-            />
-          )}
-        </>
+      {(stage === 'plan' || stage === 'respond') && (
+        <CellInspector cell={cell} onClose={() => setCell(null)} />
       )}
 
-      <MapLegend
-        selected={selected}
-        hasRoutes={stage === 'plan' && Boolean(route)}
-        simulated={Boolean(simulation)}
-      />
+      <MapLegend entries={legend} />
 
       {(healthError || !crsOk) && (
         <div className="floating-alert" data-testid="status-banner">
@@ -404,14 +759,37 @@ export default function App() {
             }}
             onToggle={() => setPlaying((current) => !current)}
             onSpeed={setSpeed}
-            onUseForRouting={plan}
+            onAct={
+              readiness.action === 'enable_override'
+                ? enableHistoricalDemonstration
+                : plan
+            }
+            onDetails={() => setProvenanceOpen(true)}
+            readiness={readiness}
             planning={busy}
+            ready={Boolean(request.departure_time)}
+            pricedHours={configuredPricedHours}
           />
         )}
 
         {stage === 'plan' && (
           <>
-            {busy || simBusy ? (
+            {routingRefused ? (
+              <RoutingGate
+                readiness={readiness}
+                onAct={
+                  readiness.action === 'enable_override'
+                    ? enableHistoricalDemonstration
+                    : plan
+                }
+                onDetails={() => setProvenanceOpen(true)}
+                busy={busy}
+                variant="panel"
+                eyebrow="Routing paused"
+                note={refusalNote}
+                testId="plan-gate"
+              />
+            ) : busy || simBusy ? (
               <PlanningState />
             ) : error && !mission ? (
               <DeckFailure code={error.code} message={error.message} />
@@ -437,10 +815,15 @@ export default function App() {
                 />
                 <PlanDock
                   comparison={shown.comparison}
+                  groups={routeGroups}
                   selected={selected}
                   expanded={expanded}
                   onSelect={setSelected}
                   onExpand={setExpanded}
+                  provenance={pricedSummary}
+                  vesselSpeedMps={shown.request?.vessel_speed_mps ?? null}
+                  canRespond={canRespond}
+                  onRespond={respond}
                 />
               </>
             ) : (
@@ -451,13 +834,60 @@ export default function App() {
             )}
           </>
         )}
+
+        {stage === 'respond' && shown && selected && (
+          <>
+            <SelectedRouteBar
+              comparison={shown.comparison}
+              profile={selected}
+              label={simulation ? 'Replanned route' : 'Current route'}
+              whyOpen={false}
+              onWhy={() => go('plan')}
+              whyLabel="Back to plan"
+              transit={
+                <TransitControl
+                  playing={transitPlaying}
+                  onToggle={() => {
+                    if (transitSecond >= total) setTransitSecond(0)
+                    setTransitPlaying((current) => !current)
+                  }}
+                  position={vesselPosition}
+                  cell={vesselCell}
+                />
+              }
+            />
+            <RespondDock
+              profile={selected}
+              simulation={simulation}
+              armed={placing}
+              busy={simBusy}
+              disabled={!online}
+              onInject={injectOnRoute}
+              onArm={() => setPlacing((current) => !current)}
+              onClear={clearSimulation}
+              onExplain={() => setChangeOpen((current) => !current)}
+              explaining={changeOpen}
+              onBack={() => go('plan')}
+              provenance={pricedSummary}
+            />
+          </>
+        )}
       </div>
+
+      {stage === 'respond' && selected && (
+        <RespondDrawer
+          simulation={simulation}
+          profile={selected}
+          open={changeOpen}
+          onClose={() => setChangeOpen(false)}
+        />
+      )}
 
       {stage === 'plan' && shown && selected && (
         <WhyDrawer
           comparison={shown.comparison}
           profile={selected}
-          simulation={simulation}
+          pricedSummary={pricedSummary}
           open={whyOpen}
           onClose={() => setWhyOpen(false)}
         />

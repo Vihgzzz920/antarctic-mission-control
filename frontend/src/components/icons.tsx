@@ -41,6 +41,19 @@ export const ContourIcon = ({ size = 16, className }: Props) =>
     </>
   ))
 
+/**
+ * Fuel-efficient: a droplet over a level line -- a quantity being spent per
+ * unit of ground covered. Deliberately NOT a fuel pump or a jerrycan: the
+ * figure is a relative proxy in open-water-equivalent metres, not a volume.
+ */
+export const DropletIcon = ({ size = 16, className }: Props) =>
+  wrap(size, className, (
+    <>
+      <path d="M8 2.2c2.3 2.7 3.5 4.7 3.5 6.2a3.5 3.5 0 0 1-7 0c0-1.5 1.2-3.5 3.5-6.2Z" />
+      <path d="M2.6 13.6h10.8" />
+    </>
+  ))
+
 /** Shortest distance: a measured straight leg. */
 export const RulerIcon = ({ size = 16, className }: Props) =>
   wrap(size, className, (
@@ -56,6 +69,7 @@ export const PROFILE_ICON: Record<
   (props: Props) => JSX.Element
 > = {
   fastest: ClockIcon,
+  fuel_efficient: DropletIcon,
   risk_oriented: ContourIcon,
   shortest_distance: RulerIcon,
 }

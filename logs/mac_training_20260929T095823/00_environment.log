@@ -1,0 +1,6 @@
+python  : 3.12.14 macOS-27.0-arm64-arm-64bit
+sklearn : 1.9.1
+joblib  : 1.6.0
+numpy   : 2.1.3
+executable: /Users/vihaangala/Desktop/SIH/.venv/bin/python
+GATE PASSED

@@ -4,6 +4,9 @@
 import type {
   ForecastResponse,
   HealthResponse,
+  MissionEvaluateRequest,
+  MissionEvaluateResponse,
+  HistoricalEvaluationResponse,
   MissionRequest,
   MissionResponse,
   ProfileName,
@@ -87,6 +90,27 @@ export function simulateIceberg(
     `/mission/simulate?profile=${profile}`,
     { method: 'POST', body: JSON.stringify({ request: mission, iceberg }) },
   )
+}
+
+/**
+ * Evaluate several candidate destinations at several departure times.
+ *
+ * Every decision the backend needs is stated in the body: omitting
+ * `environment_policy` keeps the shipped persistence policy, and naming an
+ * unsupported one is refused rather than silently replaced.
+ */
+export function evaluateMission(
+  body: MissionEvaluateRequest,
+): Promise<MissionEvaluateResponse> {
+  return request_<MissionEvaluateResponse>('/mission/evaluate', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+/** The held-out historical backtest artifact, exactly as it was produced. */
+export function getHistoricalEvaluation(): Promise<HistoricalEvaluationResponse> {
+  return request_<HistoricalEvaluationResponse>('/evaluation/historical')
 }
 
 /** The observed and predicted iceberg states the model already produced. */

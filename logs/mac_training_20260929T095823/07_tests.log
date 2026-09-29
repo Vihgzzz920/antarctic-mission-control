@@ -1,0 +1,552 @@
+---- tests/test_api.py
+Traceback (most recent call last):
+  File "/Users/vihaangala/Desktop/SIH/tests/test_api.py", line 21, in <module>
+    from fastapi.testclient import TestClient                              # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vihaangala/Desktop/SIH/.venv/lib/python3.12/site-packages/fastapi/testclient.py", line 1, in <module>
+    from starlette.testclient import TestClient as TestClient  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vihaangala/Desktop/SIH/.venv/lib/python3.12/site-packages/starlette/testclient.py", line 41, in <module>
+    raise RuntimeError(
+RuntimeError: The starlette.testclient module requires the httpx2 package to be installed.
+You can install this with:
+    $ pip install httpx2
+
+     FAILED (see the log)
+---- tests/test_end_to_end_route.py
+==============================================================================
+end-to-end route orchestration
+==============================================================================
+  PASS  test_a_declared_selection_that_the_cost_did_not_use_is_refused composing with PC3 penalties while declaring PC6 is refused: the class and table in the result are verified against the penalty every route cell was actually charged
+  PASS  test_a_departure_date_outside_the_environment_dates_is_refused a 2019 departure over 2025 environment fields is refused, not routed
+  PASS  test_changing_the_ice_class_changes_the_penalty_when_the_rio_requires_it 416 of 680 polygons are charged differently for PC3 than PC6 on table 1.3; the route total moves 1,000,000 -> 0, while a polygon whose RIO does not separate the two classes is charged identically
+  PASS  test_each_cell_is_priced_at_its_arrival_time               buckets along the route [0, 1, 2, 3, 4, 5]; each cell's cost equals its OWN bucket, and the total 175,000 exceeds the 50,000 a bucket-0 pricing would have given
+  PASS  test_explicit_historical_override_is_preserved_and_stamped the override routes and is stamped historical_demo_override=true in the provenance and in explain(); it is never the default
+  PASS  test_hard_constraint_is_respected_and_comes_only_from_the_domain route detoured through the single gap at (4, 3); a goal inside the exclusion returns hard_navigation_constraint, not a route
+  PASS  test_historical_polaris_mismatch_is_rejected_by_default    2020-12-24 chart + 2025-01-08 environment refused twice: at the provider, and again at plan_route which never inherits an override
+  PASS  test_iceberg_and_polaris_terms_never_become_hard_blocks    a cell at exposure 1.0 priced at the maximum weight is still traversable, the blocked mask is untouched, and the module never calls set_blocked_mask
+  PASS  test_iceberg_exposure_changes_the_route_in_the_controlled_scenario weight 0 -> shortcut 120.00 km (iceberg 0); weight 5 -> detour 193.14 km (iceberg 0), +73.14 km bought for 73,137
+  PASS  test_impossible_route_is_reported_cleanly                  a sealed wall gives no_feasible_path with no path, no metrics and no invented route, while the constraint and date audit survive
+  PASS  test_malformed_requests_are_refused_loudly                 7 malformed requests refused with RouteError, none silently fixed
+  PASS  test_missing_iceberg_exposure_is_also_reported_not_zeroed  a bucket with no exposure field is reported unavailable, never read as exposure 0
+  PASS  test_no_safety_claim_and_no_duplicated_formula             imports only 9 existing src modules, restates no formula, and makes no safety claim
+  PASS  test_ordinary_high_cost_is_a_route_not_a_failure           cost 40,000 -> 36,000,000 is still a route; expense is never downgraded to a failure
+  PASS  test_pc6_table_1_3_gives_a_non_zero_polaris_contribution   PC6 / table 1.3 over real polygons [5, 274, 140, 5]: POLARIS contribution 2,000,000, 1 special-consideration and 2 indeterminate cells
+  PASS  test_polaris_class_and_table_must_both_be_explicit         7 incomplete or contradictory selections refused; with neither supplied the result reports selected=False, never a default
+  PASS  test_polaris_per_cell_and_total_reconcile                  per-cell penalties rebuild the 3,000,000.000 total exactly, and the four terms still sum to the search total (residual 0)
+  PASS  test_polaris_riv_table_resolves_through_the_policy         1.3 -> default, 1.4 -> decayed_ice, resolved from the policy file and each config's own declared source; no table number appears in the module
+  PASS  test_polaris_route_is_deterministic                        3 rebuilds: identical path, POLARIS contribution 3,000,000.000 and identical per-cell classifications
+  PASS  test_polaris_selection_does_not_weaken_the_historical_mismatch_rule selecting PC6 / table 1.3 does not buy past the date rule: the 2020 chart under 2025 data is still refused, and the selection is still reported on the failed result
+  PASS  test_real_data_smoke_2025_01_08                            HISTORICAL DEMO (2020-12-24 chart over 2025-01-08 data, not an operational route): 28 cells, 186.87 km, 10.38 h, cost 11,659,270 = environment 306,968 + POLARIS 11,325,825 + iceberg 26,476; PC6/table 1.3: 28 charted-ice, 18 special-consideration, 14 indeterminate, 0 unknown-regime, 0 uncharted cells; max exposure 0.750; buckets [0, 1]
+  PASS  test_repeated_route_is_deterministic                       3 rebuilds, identical path, cost 193,137.085 and buckets
+  PASS  test_special_and_indeterminate_counts_are_defined_and_may_overlap polygon 274 is special consideration on the priced branch and indeterminate on the other; the audit defines both counts and says they overlap rather than leaving them to be added
+  PASS  test_special_consideration_indeterminate_and_unknown_never_block a corridor made only of special-consideration, indeterminate and unknown cells is still traversable; every penalty is finite and no mask was created
+  PASS  test_successful_end_to_end_route                           7 cells, 68.28 km, 6.83 h, cost 68,284, terms reconcile to 0
+  PASS  test_unavailable_forecast_is_reported_not_guessed          missing bucket 1 -> forecast_unavailable, no substituted field, no route
+  PASS  test_unknown_regime_keeps_the_existing_unknown_behaviour   polygon 360 has no defensible regime: it keeps the configured unknown penalty 100 and the state charted_unknown_regime; no RIO is fabricated for it
+  PASS  test_water_takes_no_rio_and_no_polaris_penalty             polygon 0 is POLY_TYPE=W: no RIO, zero POLARIS penalty, state charted_water -- and the record still says has_rio=False rather than inventing a regime
+
+all 28 tests passed
+     ok
+---- tests/test_environment_timeline.py
+PASS  test_a_different_future_environment_gives_a_different_route
+      time-varying -> corridor B (cost 136,569), persistence -> corridor A (planned 136,569, but 970,955 once each cell is priced on arrival); identical mission inputs
+PASS  test_a_missing_environment_is_refused_not_substituted
+      refused: bucket 4 (2025-01-09T00:00:00 .. 2025-01-09T06:00:00) needs the environment for 2025-01-09, whic
+PASS  test_an_unpriceable_bucket_is_still_refused
+      refused rather than extrapolated: goal is unreachable: every route from start is closed off or falls beyond max_horizon_s=
+PASS  test_bucket_windows_are_departure_plus_elapsed_time
+      windows b0@+0h b1@+6h b2@+12h; bucket_for agrees at every edge
+PASS  test_dated_policy_gives_each_bucket_its_own_observation
+      bucket 0 -> observation:2025-01-08, bucket 4 -> observation:2025-01-09 [flagged as an observation from after the analysis]
+PASS  test_each_cell_is_priced_from_the_field_its_bucket_resolved_to
+      arrival time selects the field: (5, 8)@8.83h -> bucket 1 (observation:2025-01-09) = 1  (the departure analysis would have charged 60)
+PASS  test_invalid_specifications_are_refused
+      7 malformed specifications refused
+PASS  test_persistence_carries_the_analysis_forward_and_says_so
+      buckets 0,1 inside 2025-01-08 carry nothing forward; buckets 4,5 open on 2025-01-09 and are stamped persisted_from_2025-01-08
+PASS  test_the_fallback_is_available_but_must_be_asked_for
+      the documented fallback is opt-in and is recorded on the bucket that used it
+PASS  test_the_fields_carry_their_resolution_into_the_provenance
+      every bucket's field reports the environment it was built from
+PASS  test_the_shipped_demo_window_persists_nothing
+      persistence_from_departure_analysis: one field, ['2025-01-08'], declared rather than assumed
+
+11/11 passed
+     ok
+---- tests/test_era5_wind.py
+==============================================================================
+ERA5 10 m wind ingestion and step matching
+==============================================================================
+  PASS  test_a_missing_corner_refuses_the_whole_sample           a NaN corner refuses that sample; neighbouring cells still resolve
+  PASS  test_a_regional_box_still_refuses_outside_longitudes     a regional longitude box does not wrap and still refuses outside
+  PASS  test_bilinear_interpolation_is_exact_on_a_linear_field   exact at grid points, at cell midpoints and off-centre on a linear field; midpoint equals the mean of its four corners
+  PASS  test_current_sampling_agrees_with_the_existing_audit_rule 400 real steps: both the audit and the matcher find 380 usable currents -- one rule, not two
+  PASS  test_deterministic_matching                              identical CSV bytes and identical state counts on a rerun
+  PASS  test_dry_run_is_the_default_and_no_key_is_touched        no credential name appears in the code; status reports state only, and a transfer needs an explicit --download
+  PASS  test_longitude_wraps_at_the_antimeridian                 179.9273 E now interpolates between 179.75 and -180 (w=0.7092) instead of refusing; 179.75 itself is unchanged
+  PASS  test_manifest_records_conventions_and_promises           manifest carries dataset, both sampling methods, the 00 UTC convention, the frame warning and consistent missingness counts
+  PASS  test_match_state_classification                          current_missing and both_missing classified; every required column present
+  PASS  test_matching_is_at_the_start_position_and_start_date    wind sampled at the START lat/lon and START date, not the end
+  PASS  test_missing_values_are_empty_never_zero                 an unavailable value is an empty cell with a reason, not 0.0
+  PASS  test_no_gap_is_filled                                    the 28-day step stays one row with elapsed_days=28; nothing bridged
+  PASS  test_no_model_or_routing_code_was_added                  neither module fits anything, routes anything or touches POLARIS
+  PASS  test_only_days_with_a_current_are_requested              365 days requested, every one of them inside the 365 days of GLORYS on disk
+  PASS  test_outside_the_domain_is_refused_not_extrapolated      one cell beyond each edge refuses; the exact corner still samples
+  PASS  test_provenance_file_is_one_valid_json_document          19,616 chars parse as exactly one document; the only trailing byte is a real newline
+  PASS  test_provenance_keeps_all_twelve_monthly_requests        12 months, 365 days, each record keeping variables, year/month/day, area, grid and the sha256 of the file it produced
+  PASS  test_provenance_repair_is_deterministic_and_downloads_nothing two repairs agree on every field except the timestamps; 12 .nc files untouched, 0 sha256 changed
+  PASS  test_request_is_derived_from_the_real_data_not_hardcoded area [-48.5, -180.0, -79.0, 180.0] derived from 24,203 candidate steps; no bound hardcoded
+  PASS  test_the_writer_cannot_emit_a_literal_backslash_n        write_provenance validates its own output and ends in one newline
+  PASS  test_timestamp_conversion_and_00utc_convention           epoch seconds -> tz-aware UTC; 00 UTC resolves, 06 UTC refuses rather than snapping to the nearest hour
+  PASS  test_u_v_recognition_covers_the_known_spellings          both the new 'valid_time' and the legacy 'time' axis are accepted
+  PASS  test_units_are_checked_not_assumed                       m s**-1 accepted; knots refused rather than silently converted
+  PASS  test_variable_and_schema_validation                      u10/v10/valid_time/latitude/longitude recognised; a renamed u refused
+  PASS  test_wrapping_does_not_disturb_interior_or_latitude      interior longitudes still exact on a linear field; latitude still refuses beyond both edges
+
+all 25 tests passed
+     ok
+---- tests/test_forecast_temporal_architecture.py
+PASS  test_a_backwards_or_malformed_request_is_refused
+      unknown policies, unknown validity rules and inverted windows refused
+PASS  test_a_forecast_is_never_confused_with_an_observation
+      observation sic_20250108.tif and forecast sic_forecast_hgb_origin20250108_plus24h_valid20250109_3976.tif differ on 144,228 co-valid cells
+PASS  test_a_legitimate_forecast_changes_the_time_dependent_edge_costs
+      forecast-driven -> corridor B (cost 136,569); persistence -> corridor A (planned 136,569, 970,955 priced on arrival); identical mission inputs
+PASS  test_a_point_valid_forecast_cannot_serve_a_six_hour_bucket
+      +24h resolves at the instant only; buckets 0-6, 6-12, 18-24 and 24-30 h are all refused under exact_valid_time
+PASS  test_an_unregistered_lead_is_not_quietly_assumed
+      a lead the project never considered returns None, not a default
+PASS  test_every_answer_carries_its_provenance
+      four answers, each with source_type, model, fallback and a reason
+PASS  test_persistence_is_never_returned_unless_it_was_asked_for
+      the default policy returns unavailable; persistence appears only under the policy that names it
+PASS  test_the_buckets_carry_their_source_into_the_route_provenance
+      every priced bucket reports its source type, model and valid time through the existing provider provenance
+PASS  test_the_composite_day_reading_covers_only_buckets_inside_the_target_day
+      covered 24-30h, 30-36h, 42-48h; refused 0-6h, 12-18h, 18-24h, 48-54h
+PASS  test_the_dataset_builder_supports_whole_day_leads_and_nothing_finer
+      +24 h: 362 pairs, +48 h: 361 pairs; sub-daily leads cannot be requested at all
+PASS  test_the_resolved_forecast_never_predates_its_own_origin
+      the artifact the resolver returned still carries its own no-future-input record
+PASS  test_the_shipped_default_policy_is_untouched
+      the departure-day policy still gives one observed analysis per bucket, with no model involved
+PASS  test_the_supported_leads_are_explicit_and_match_the_archive
+      archive: 362 true +24 h pairs, 361 true +48 h pairs, 0 sub-daily observations -> modelled [24]
+PASS  test_the_timeline_asks_the_registry_and_reports_what_it_got
+      buckets 0,1,3 -> explicit persistence; buckets 4,5 -> HistGradientBoostingRegressor +24 h, each stated per bucket
+PASS  test_the_timeline_refuses_rather_than_substituting_another_time
+      an uncovered bucket is refused by default, and the policy cannot run without the registry behind it
+PASS  test_validity_intervals_are_derived_and_named
+      exact_valid_time -> a point; target_composite_day -> [2025-01-09, 2025-01-10); unknown rules are refused
+
+16/16 passed
+     ok
+---- tests/test_forecast_training_leads.py
+PASS  test_a_48h_run_cannot_land_on_the_24h_artifact
+      +48 h defaults to its own artifact; +24 h still defaults to forecast_model_hgb.joblib
+PASS  test_a_lead_that_disagrees_with_the_dataset_is_refused
+      lead_hours=48 on a 24 h dataset and lead_hours=24 on a 48 h dataset are both refused, with the mismatch named
+PASS  test_a_sub_daily_lead_is_refused_outright
+      6 h, 12 h, 1 h and 23 h are refused before any dataset check
+PASS  test_each_lead_gets_its_own_artifact_path
+      24 h keeps the shipped path; every other lead gets forecast_model_hgb_<lead>h.joblib
+PASS  test_missing_lead_metadata_is_refused_not_assumed
+      a legacy dataset's lead is derived from its own dates; a dataset with no dates at all is refused, never assumed
+PASS  test_the_cli_accepts_an_explicit_dataset_and_output
+      --dataset / --out / --metrics-out / --lead-hours all accepted
+PASS  test_the_dataset_cli_supports_the_48h_build_without_running_it
+      --lead-days 2 --gap-days 1 -> 357 true 2-day pairs (361 without the gap); features unchanged; lead written to the npz
+PASS  test_the_lead_is_never_taken_from_a_filename
+      a dataset named forecast_dataset_48h.npz that holds 24 h targets is read as 24 h, and --lead-hours 48 on it is refused
+PASS  test_the_lead_is_recorded_in_the_provenance
+      +24 h -> forecast_model_hgb.joblib, +48 h -> forecast_model_hgb_48h.joblib, each carrying its own lead
+PASS  test_the_leakage_checks_are_enforced_before_fitting
+      origin-only features, a separate target array and an exact lead offset are all asserted before model.fit is reached
+PASS  test_the_original_flag_spellings_still_work
+      --npz and --model-out remain aliases; bare invocation unchanged
+PASS  test_the_shipped_24h_paths_are_unchanged
+      forecast_dataset.npz carries no lead field and still resolves to +24 h -- derived from the dataset's own base and target date ranges
+PASS  test_the_training_pipeline_imports_no_routing_or_frontend_code
+      neither training module imports routing, api or validation code: training cannot change how a route is priced
+
+13/13 passed
+     ok
+---- tests/test_iceberg_ml_residual.py
+==============================================================================
+iceberg ML residual correction
+==============================================================================
+  PASS  test_chronological_split_is_never_randomised             boundaries 2025-08-07 / 2025-10-21 are reproduced from reversed input; no date sits in two splits; no shuffling primitive appears
+  PASS  test_configuration_validation                            four malformed configurations and a missing file all refused
+  PASS  test_corrected_displacement_is_physics_plus_predicted_residual over 40 rows the endpoint decomposes back to physics + residual to within 1.82e-09 m
+  PASS  test_displacement_and_offset_are_inverses                offset then decompose returns the same east/north, dateline included
+  PASS  test_feature_matrix_ordering_is_the_configured_order     10 columns land in the configured order, not sorted
+  PASS  test_missing_or_non_finite_input_is_refused_not_imputed  None, NaN, inf and an absent column are all refused, never filled
+  PASS  test_moved_definition_uses_the_project_distance_function moved == great_circle_m(start, observed_end) > 0 on 200 real rows
+  PASS  test_no_deep_learning_cone_risk_or_routing_code          one sklearn estimator; no network, cone, risk raster or router
+  PASS  test_no_future_date_leaks_across_the_splits              train <= 2025-08-06 < 2025-08-07 <= validation <= 2025-10-20 < 2025-10-21 <= test; the three sets are disjoint
+  PASS  test_no_row_from_validation_or_test_is_ever_fitted       all 3 _fit_pair calls in run() take moved['train'] only
+  PASS  test_prediction_table_schema_covers_all_three_baselines  23 columns carry all three baselines and the split
+  PASS  test_repeated_fitting_is_deterministic                   two fits with random_state=20260925 predict identically
+  PASS  test_the_ablation_reports_its_own_degeneracy             physics features are a x86400 rescale of the current features (r=1); the flag matches the two models predicting identically on all 301 test rows
+  PASS  test_the_observed_endpoint_cannot_enter_the_prediction_api neither predict_corrected nor feature_matrix names an observed or residual field, and prediction works on rows with none present
+  PASS  test_the_target_is_not_among_the_features                10 features, none matching ['observed_end', 'observed_disp', 'residual', 'target', 'future', 'end_lat', 'end_lon']; a config that lists the endpoint is refused at load time
+  PASS  test_training_population_is_moved_rows_only              893 moved training rows; the 1790 zero-displacement rows in the same window are excluded from the fit
+
+all 16 tests passed
+     ok
+---- tests/test_iceberg_navigation_cost.py
+==============================================================================
+iceberg exposure in the navigation cost
+==============================================================================
+  PASS  test_configuration_validation                              nine malformed configurations and a missing file all refused
+  PASS  test_different_arrival_buckets_give_different_exposure     cell (0,1) 0.5 -> 0.0 and cell (0,2) 0.0 -> 0.9 across the bucket boundary; the iceberg term follows
+  PASS  test_exposure_is_selected_by_arrival_time                  cell (0,1) priced at t=1.5 h uses bucket 1 (exposure 0.0), not the departure bucket 0 (exposure 0.5); bucket_for is delegated to the base provider, never restated
+  PASS  test_extrapolated_flag_is_preserved                        the 48 h bucket carries extrapolated_uncertainty=True through to the cell result, the explanation and the provenance
+  PASS  test_integration_a_moving_iceberg_changes_the_cost_of_one_cell same cell: clear on arrival at 0.5 h, +24 cost on arrival at 1.5 h when the cone has moved over it
+  PASS  test_integration_time_astar_reroutes_around_a_moving_iceberg unmodified time_astar: weight 0 routes north, weight 50 routes south around the cone. Repriced at weight 50 the rejected north route costs 1,604,680 against 68,284 for the one taken -- 1,536,396 of exposure avoided
+  PASS  test_no_formula_is_duplicated                              only ['src.routing.iceberg_risk', 'src.routing.time_navigation_cost'] imported from src; no cost, RIO, cone or uncertainty formula is restated
+  PASS  test_no_hard_block_and_infinite_cost_passes_through        an infinite composed cost stays infinite and is not topped up; no mask identifier exists in the module
+  PASS  test_positive_weight_increases_cost_proportionally         exposure 0.5: cost rises 27 -> 47 exactly linearly in the weight; a zero-exposure cell never moves
+  PASS  test_provenance_is_preserved                               iceberg id, centre, radius, horizon, flag, bucket and arrival time all reach the cell result; the five components still sum
+  PASS  test_real_data_smoke_from_the_generated_exposure_rasters   real rasters load into the provider: cells 06h=76, 12h=147, 24h=296, 48h=574; only 48 h flagged extrapolated
+  PASS  test_repeated_calculation_is_deterministic                 60 lookups identical, and across rebuilds
+  PASS  test_shape_mismatch_and_out_of_range_exposure_are_refused  wrong shape, exposure outside [0,1], NaN and a duplicate bucket refused
+  PASS  test_temporal_mismatch_is_rejected_by_default              an iceberg forecast dated 2020-12-24 over a 2025-01-08 environment is refused; the override is explicit and stamped
+  PASS  test_unavailable_exposure_is_explicit_never_zero           default raises; the opt-in policy adds nothing but stamps iceberg_exposure_unavailable with exposure=None, which is not 0.0
+  PASS  test_weight_zero_reproduces_the_existing_composed_cost_exactly weight 0 gives the base cost bit for bit at every cell and time, while still reporting the exposure it chose not to charge for
+  PASS  test_zero_exposure_gives_zero_iceberg_cost                 exposure 0.0 costs 0.0 and is still state=priced, not 'unavailable'
+
+all 17 tests passed
+     ok
+---- tests/test_iceberg_physics.py
+==============================================================================
+iceberg drift physics baseline
+==============================================================================
+  PASS  test_basis_is_orthonormal_so_the_transpose_really_is_the_inverse east.north <= 7.3e-14, |unit| - 1 <= 1.1e-16 over 15 Antarctic positions
+  PASS  test_both_baselines_are_scored_on_identical_rows           both baselines scored on the same 4,639 rows; 3,142 of them have zero observed displacement
+  PASS  test_calibration_declines_when_the_sample_is_too_small     with 5 usable rows the fit is declined and the configured values stand
+  PASS  test_configured_parameter_validation                       out-of-limit, negative, non-numeric, infinite, absent and missing-file configurations all refused; the shipped defaults are 0.0/0.0
+  PASS  test_displacement_integration_and_elapsed_time             1 m/s x 86400 s = 86.4 km travelled; halving dt halves it; a zero, negative or non-finite elapsed time is refused
+  PASS  test_local_basis_matches_the_convention_the_currents_were_rotated_with 5 grid cells: this module's east/north basis matches the cached _grid_geometry to 2.22e-16 -- one convention, not two
+  PASS  test_longitude_wrapping_and_a_dateline_crossing_trajectory 0.5 m/s east from 179.9E lands at -179.1807 with the distance preserved to <1 m; the westward crossing mirrors it
+  PASS  test_missing_environmental_input_is_refused_not_filled     a row lacking a current or a wind value is refused, never zero-filled
+  PASS  test_no_ml_cone_risk_or_routing_code                       no estimator, cone, risk raster or routing symbol anywhere in the code
+  PASS  test_no_scientific_constant_is_hardcoded                   no literature windage value or turning angle is written into the code
+  PASS  test_persistence_uses_the_previous_step_not_the_target     persistence carries the preceding step's observed velocity; it reads velocities and dates, never an end position
+  PASS  test_pure_current_is_passed_through_untouched              with zero wind the drift is exactly the current, in east/north
+  PASS  test_pure_eastward_wind_points_the_expected_way_in_epsg3976 1 m/s due east at 70S -> (1.0, 0.0) at 0E, (0.0, -1.0) at 90E, (-1.0, 0.0) at 180; due north at 0E -> (0, 1)
+  PASS  test_pure_wind_scales_by_the_windage_coefficient_only      10 m/s east, zero current -> drift east = k*10 for k in 0, 0.01, 0.05
+  PASS  test_raw_component_addition_would_have_been_wrong          at 70S 90E the frame-correct drift is 0.300E/0.200N m/s; adding raw components gives 0.500/0.000 -- 0.283 m/s apart
+  PASS  test_real_dataset_loads_and_the_clean_windows_are_what_they_should_be 737,442 rows joined; 4,645 clean 24h and 60 clean 48h rows with both environmental inputs
+  PASS  test_repeated_prediction_is_deterministic                  6 identical calls, bit-for-bit
+  PASS  test_the_target_endpoint_cannot_reach_the_predictor        StepInputs has exactly the 7 permitted fields; none of the four prediction functions mentions an observed endpoint
+  PASS  test_wind_and_current_are_in_the_same_basis_before_they_are_added round-trip exact and speed-preserving; summing in EPSG:3976 equals summing in the geographic basis, so one frame is used throughout
+  PASS  test_wind_turning_angle                                    +90 deg rotates east to north (CCW), speed preserved; the sign convention is stated in the config
+  PASS  test_zero_wind_and_zero_current                            no forcing -> the berg does not move
+
+all 21 tests passed
+     ok
+---- tests/test_iceberg_risk.py
+==============================================================================
+dynamic iceberg exposure layer
+==============================================================================
+  PASS  test_antimeridian                                      32 cells span longitudes -179.93 to 179.93; every distance stays under the radius
+  PASS  test_center_edge_and_outside                           centre 1.0, half-radius 0.5, edge exactly 0.0, outside 0.0; the constant variant is 1 inside and 0 at the edge
+  PASS  test_configuration_validation                          nine malformed configurations refused, including sum, mean, nodata=0, and any attempt to enable ML or iceberg size
+  PASS  test_contributing_iceberg_provenance                   55 non-zero cells, each naming its iceberg with a distance and radius that reproduce its exposure
+  PASS  test_determinism                                       identical forecasts, grids, dominance maps and provenance on a rerun
+  PASS  test_exposure_is_finite_and_within_zero_one            grid exposure in [0.0, 0.9167]; bad inputs refused
+  PASS  test_no_degree_metre_mix_up_and_no_projected_distance_test exposure reproduces the TRUE-distance formula to <1e-6 at every latitude; the projected-metre method would have been off by up to 0.032 at 62S against 0.012 at 76S
+  PASS  test_no_hard_mask_no_probability_no_routing_code       no mask, no probability, no router, no ML, no size; physics and uncertainty are imported, not restated
+  PASS  test_raster_alignment_and_that_zero_is_not_nodata      EPSG:3976, 1328x1264, 6250 m, float32, nodata=None; the tags say 0 means no modeled exposure, not clear water
+  PASS  test_search_window_never_clips_a_cone                  scanning a window far wider than the one the code uses finds no cell inside the radius that the code missed, at three latitudes
+  PASS  test_the_vectorised_distance_matches_the_project_scalar_function 81 cells: array haversine matches great_circle_m to 0.00e+00 m
+  PASS  test_two_overlapping_cones_take_the_max_not_the_sum    20 overlapping cells: combined == max(a, b) everywhere, sum would reach 1.397 > 1, and each cell names the iceberg that won
+  PASS  test_zero_horizon_and_the_24h_and_48h_labels           t=0 -> radius 0 at the start position; 6/12/24 h calibrated 9.0505/12.7994/18.1011 km; 48 h 25.5988 km flagged extrapolated
+  PASS  test_zero_radius_exposes_nothing                       a zero radius exposes no cell and divides by nothing
+
+all 14 tests passed
+     ok
+---- tests/test_iceberg_uncertainty.py
+==============================================================================
+iceberg forecast uncertainty cone
+==============================================================================
+  PASS  test_24h_versus_extrapolated_48h_labelling             24 h is calibrated, 48 h carries extrapolated_uncertainty=True, and both state empirically_calibrated_to_hours=24.0
+  PASS  test_configuration_validation                          nine malformed configurations and a missing file all refused
+  PASS  test_coverage_counts_are_what_they_claim               301 held-out rows; every reported fraction recomputed from the raw errors and matches
+  PASS  test_linear_growth_is_available_for_sensitivity        linear gives 36.20 km at 48 h against sqrt's 25.60 km; the shipped law stays power and the config forbids choosing between them on the 48 h rows
+  PASS  test_negative_horizon_is_rejected                      negative, non-finite, string, None and bool horizons all refused
+  PASS  test_no_observed_endpoint_can_reach_the_radius         uncertainty_at takes no observed field and names none; the radius is identical for two different icebergs at one horizon
+  PASS  test_no_risk_raster_route_cost_probability_or_ml       no estimator, risk raster, collision probability, route cost or router; advect and the physics model are imported, and windage appears only as a recorded constant
+  PASS  test_output_is_deterministic                           identical calibration, radii and CSV bytes across two runs
+  PASS  test_prediction_table_carries_full_provenance          150 rows over 3 horizons; one radius per horizon; everything above 24 h flagged extrapolated
+  PASS  test_radius_is_always_finite_and_non_negative          9 horizons x 2 laws all finite and >= 0; the 5000 km cap refuses a runaway radius
+  PASS  test_secondary_component_statistics_stay_secondary     east/north sd 34.40/32.60 km (ratio 1.055, r=+0.845) reported but never read by the radius
+  PASS  test_square_root_growth                                48 h / 24 h = sqrt(2) exactly; 96 h doubles, 6 h halves; the config states the exponent is assumed, not measured
+  PASS  test_the_24h_radius_is_the_calibrated_quantile         radius(24h) = 18.1011 km = the q90 of 1197 calibration errors; in-sample coverage 0.8997
+  PASS  test_the_test_split_is_never_used_to_calibrate         calibration uses 1197 train+validation rows ending 2025-10-20; deleting every test row changes nothing, and a config naming 'test' is refused
+  PASS  test_zero_horizon_gives_zero_radius                    t=0 gives exactly 0 km under both growth laws, and is not extrapolated
+
+all 15 tests passed
+     ok
+---- tests/test_icebergs_data.py
+==============================================================================
+iceberg observation ingestion / standardisation
+==============================================================================
+  PASS  test_a_sensor_without_a_flag_column_is_unknown_not_false   no _3 column -> both fields empty (unknown), never False
+  PASS  test_an_extra_undocumented_sensor_column_is_preserved_verbatim nic_7 round-trips into source_fields and influences nothing
+  PASS  test_coordinate_validation_and_longitude_normalisation     ranges enforced, out-of-range raises (never clamped), 181 -> -179, and an in-range longitude is returned bit-for-bit
+  PASS  test_current_availability_audit_reads_only                 365 GLORYS days on disk; 0/2 fixture steps have one; nothing written
+  PASS  test_duplicates_are_marked_not_removed                     identical (iceberg, date, sensor) rows kept, both marked group size 2
+  PASS  test_every_real_source_observation_survives                9 source rows -> 9 observations, each traceable to file and line
+  PASS  test_fetch_module_names_one_official_source_only           only www.scp.byu.edu is ever contacted; no mirror, no fallback
+  PASS  test_invalid_dates_are_rejected_not_coerced                day 0, day 366 in a common year, wrong width, text and out-of-era refused
+  PASS  test_leap_year_handling                                    day 060 differs by year; 366 valid in 2024/2000, rejected in 1900
+  PASS  test_missing_archive_refuses_rather_than_inventing         an absent archive raises and names the fetch step; no stub data
+  PASS  test_missing_optional_sensor_and_size_are_accepted         two different families in one run; the file without sizes gets none
+  PASS  test_multi_sensor_rows_become_one_row_per_sensor           one row with two sensor fixes -> 2 rows, no precedence invented
+  PASS  test_no_model_or_routing_code_was_added                    neither module imports a model, a router, POLARIS or a drift term
+  PASS  test_nothing_is_fabricated_end_to_end                      3 source rows in, 3 observations out, the 89 missing days stay missing
+  PASS  test_observation_flag_is_preserved_without_filtering       1/1/0 preserved and mapped to is_interpolated; nothing dropped or skipped because of it, and both step classes are counted
+  PASS  test_provenance_and_the_new_manifest_fields                manifest carries schema count, files per family, normalised/unsupported counts and README quotes; every row keeps filename, line, family and its original YYYYDDD
+  PASS  test_real_archive_headers_all_normalise                    647 files, 27 headers, 8 sensors, 0 unsupported, every header a subset of the 27-column union
+  PASS  test_repeated_processing_is_deterministic                  identical observations, steps and CSV bytes across two full runs
+  PASS  test_schema_family_is_deterministic_and_order_independent  family id depends on the column set, never on column order
+  PASS  test_sentinel_wins_over_a_contradicting_observation_flag   0,0 flagged as an observation is still no data, and the clash is counted
+  PASS  test_sizes_are_converted_from_nautical_miles_and_kept_in_source_units 25 nm -> 46.300 km, source nm retained; a zero axis is missing, not a zero-length iceberg
+  PASS  test_step_construction_and_gap_preservation                a03's 3 NIC reports -> 2 steps flagged gap_28d and gap_63d
+  PASS  test_steps_never_cross_sensors                             consecutive fixes from different sensors produce no step
+  PASS  test_subset_schema_is_accepted                             a nic-only header normalises; a missing sensor is not an error
+  PASS  test_superset_schema_is_accepted                           7-sensor header and an unseen instrument both normalise by the same rule
+  PASS  test_unsupported_header_structure_is_refused_whole         6 malformed structures refused; the bad file is named with its offending column and contributes no rows, the good file still does
+  PASS  test_velocity_and_displacement                             1 deg lat/day = 1.2870 m/s north; dateline hop 9,749 m eastward; method recorded on every row
+  PASS  test_wind_audit_reports_missing_prerequisites_without_substituting ERA5 NOT configured: 2 prerequisites missing; no substitute considered
+  PASS  test_yyyyddd_conversion                                    1978204 -> 1978-07-23; 2025112 -> 2025-04-22 (the source's last day)
+  PASS  test_zero_or_negative_elapsed_time_produces_no_step        same-day pair has no elapsed time, so no velocity is manufactured
+  PASS  test_zero_zero_is_no_data_not_a_position                   a01's three nic (0,0) pairs yield no observation; only the three real sass fixes survive
+
+all 31 tests passed
+     ok
+---- tests/test_navigation_cost.py
+==============================================================================
+navigation cost composer
+==============================================================================
+  PASS  test_changing_the_weight_changes_only_that_component w 0 -> 5: POLARIS and environmental untouched; only the third term moves
+  PASS  test_composition_is_deterministic_and_non_negative   identical on a rerun; all finite composed costs >= 0
+  PASS  test_mixed_cell_fraction_03                          frac 0.3 -> uncertainty 0.7; penalty 0; not averaged
+  PASS  test_mixed_cell_fraction_08                          frac 0.8 -> uncertainty 0.2; penalty 100 unchanged; composed 101.5
+  PASS  test_no_area_weighted_rio                            every cell's penalty is its dominant polygon's, unscaled and unblended (0.8-covered cell still carries the full 100)
+  PASS  test_no_hard_block_output                            no mask attribute; +inf only where cost.py already had it
+  PASS  test_ordinary_fully_covered_cell                     env 1.0 + POLARIS 25 + cover 0 = 26
+  PASS  test_partial_single_polygon_cell_is_not_mixed        fraction 0.6, single polygon: partial=True mixed=False, uncertainty 0.4
+  PASS  test_polaris_penalty_changes_the_final_cost          penalty 25 -> 75 moves composed 26 -> 76
+  PASS  test_real_chart_composition_runs_and_balances        1,102,630 charted / 575,962 uncharted; max composed 26.5
+  PASS  test_rejects_invalid_configuration                   infinite, negative and non-numeric weights all rejected by the loader
+  PASS  test_uncharted_cell_gets_no_polaris_and_no_uncertainty uncharted: POLARIS 0, uncertainty 0 even at weight 10, composed 2 = environmental only
+  PASS  test_unknown_regime_uses_the_risk_adapters_unknown_penalty charted-but-unknown kept distinct from uncharted; unknown penalty 100
+  PASS  test_water_cell_keeps_water_state_and_no_rio         charted water: state=charted_water, POLARIS 0, composed 1
+  PASS  test_weight_zero_contributes_nothing                 weight 0.0: signal preserved, cost contribution exactly zero
+
+all 15 tests passed
+     ok
+---- tests/test_polaris_rio.py
+==============================================================================
+POLARIS RIO layer -- ANTARC20201224.dbf
+==============================================================================
+  PASS  test_band_classification_comes_from_the_riv_config   #0 PC6 -> normal_operation; Not Ice Strengthened -> normal_operation
+  PASS  test_band_straddling_sets_indeterminate              #101 (IA) RIO -2..14 spans operation_subject_to_special_consideration -> normal_operation
+  PASS  test_both_riv_tables_load_and_decay_is_never_worse   #0 table 1.3 RIO 30..30  ->  table 1.4 30..30
+  PASS  test_calculation_is_deterministic                    polygons 0, 5, 56, 186, 334, 360 identical on repeat calculation
+  PASS  test_ct_interval_is_propagated_not_collapsed         #5 CT=13 [1..3/10] -> RIO 27..29
+  PASS  test_exact_10_of_10_regime_is_a_point                #0 exact, no iceberg -> point RIO 30; #404 CT=92 with iceberg -> -14..-8 (iceberg bound only)
+  PASS  test_impossible_residual_yields_no_rio_and_is_never_clamped #157 with CT forced to 13 (MODIFIED) -> no RIO; 2 reasons recorded
+  PASS  test_mapping_sensitive_reports_both_readings         #140 conservative RIO -6 [elevated_operational_risk]  vs  optimistic 0 [normal_operation]
+  PASS  test_multiple_exact_partials_sum_and_close_with_ice_free #334 CA/CB/CC=40/20/30 residual Ice-Free=1/10
+  PASS  test_no_hard_block_is_produced                       557 special-consideration cells reported, none converted into a block
+  PASS  test_partials_absent_uses_the_policy_reading_and_keeps_its_state #5 CT=13 SA=83 -> stage takes 3.0/10, RIO 27..29
+  PASS  test_partials_absent_with_an_iceberg_is_not_silently_clamped #5 MODIFIED to partials_absent + iceberg -> state=partials_absent, 2 reasons recorded
+  PASS  test_sa98_iceberg_fraction_is_bounded_not_given_a_riv #186 iceberg 4/10 bounded: worst as 'Grey White Ice', best as 'Ice-Free'  RIO 25..29
+  PASS  test_sa98_with_sb_missing_returns_unknown_without_a_value #360 SA=98 SB=-9 -> no RIO, no default, unknown stays unknown
+  PASS  test_so98_trace_is_flagged_and_does_not_enter_rio    #5 SO=98 -> trace flag set, no term added to the RIO sum
+
+all 15 tests passed
+     ok
+---- tests/test_polaris_risk.py
+==============================================================================
+POLARIS risk adapter -- ANTARC20201224.dbf
+==============================================================================
+  PASS  test_band_straddling_stays_indeterminate_with_both_endpoints #140 RIO -6..6  elevated_operational_risk(p=25) .. normal_operation(p=0)
+  PASS  test_changing_the_configuration_changes_the_penalties  #0 default penalty 0 -> 7 with an alternative config
+  PASS  test_conservative_and_optimistic_penalties_stay_distinct #140 conservative 100 vs optimistic 0; 297 such cells in the chart
+  PASS  test_elevated_risk_gets_the_configured_elevated_penalty #220 (PC6) elevated_operational_risk -> 25
+  PASS  test_every_classification_has_a_configured_penalty     classifications seen: ['elevated_operational_risk', 'indeterminate', 'normal_operation', 'operation_subject_to_special_consideration', 'unknown']; all configured
+  PASS  test_indeterminate_gets_the_configured_indeterminate_penalty #140 indeterminate -> 100
+  PASS  test_mapping_sensitive_preserves_both_branches         #140 conservative=indeterminate optimistic=normal_operation
+  PASS  test_no_output_can_create_a_hard_block                 no blocking attribute on any result; all penalties finite (max seen 100); infinite penalty rejected by the loader
+  PASS  test_normal_operation_gets_the_configured_normal_penalty #0 normal_operation -> penalty 0
+  PASS  test_penalties_are_deterministic                       cells 0, 5, 101, 186, 334, 360 identical on repeat assessment
+  PASS  test_special_consideration_gets_the_configured_special_penalty #274 special consideration -> 100
+  PASS  test_unknown_gets_the_configured_unknown_penalty       #360 no RIO -> penalty 100, still not an exclusion
+
+all 12 tests passed
+     ok
+---- tests/test_rasterize_sigrid3.py
+==============================================================================
+SIGRID-3 rasterisation (area rule) -- ANTARC20201224
+==============================================================================
+  PASS  test_adjacent_polygons_in_one_cell_are_mixed_not_overlap CONSTRUCTED adjacency: 2 contributors, total area share 1.000 (not >1)
+  PASS  test_boundary_only_contact_is_not_an_intersection      CONSTRUCTED shared edge: 1 contributor per cell, 0 mixed cells
+  PASS  test_coverage_and_unknown_are_complementary            charted 1,102,630  uncharted 575,962
+  PASS  test_dominant_area_wins_and_ties_go_to_the_lowest_id   75/25 -> larger wins; exact 50/50 tie -> lowest polygon_id, both orders
+  PASS  test_genuine_source_overlap_is_distinguished           CONSTRUCTED overlap: area share 1.50 > 1; real chart max share 1.0000 -> 0 genuine overlaps
+  PASS  test_geometry_reader_handles_holes                     680 records; 111 with holes; max rings 270
+  PASS  test_missing_coverage_never_becomes_ice_free           575,962 uncovered: id=-1, water=0, fraction=-1.0, metadata states 0 is NOT ice-free
+  PASS  test_mixed_cells_are_not_presented_as_full_coverage    51,010 partial cells (8,599 of them single-polygon and NOT flagged mixed); contract present on 4 rasters and both sidecars; per-polygon counts reconcile
+  PASS  test_no_hard_block_or_navigability_output              7 outputs, none a navigability or cost layer
+  PASS  test_nodata_is_explicit_and_correct                    polygon_id nodata=-1, fraction nodata=-1.0, categorical bands carry none
+  PASS  test_outputs_are_on_the_exact_routing_grid             5 rasters on EPSG:3976 1328x1264 @6250 m
+  PASS  test_polygon_covering_a_cell_without_its_centre_is_still_coverage CONSTRUCTED sliver: area frac 0.31 charted, centre rule blind; real chart: 4,933 such cells
+  PASS  test_polygon_provenance_is_intact                      671 ids in the raster, all in the chart; sidecar has all 680
+  PASS  test_rasterisation_is_deterministic                    all bands, counts, fractions and the mixed-cell record identical on a rerun
+  PASS  test_real_chart_mixed_cells_are_all_adjacency          42,411 mixed cells, all adjacency; max contributors 5
+  PASS  test_source_crs_is_read_and_is_not_the_target          source lat_ts=-60 lon_0=180 -> EPSG:3976 (lat_ts -70, lon_0 0): real reprojection
+  PASS  test_uncertainty_is_not_collapsed                      631 polygons with RIO for 12 classes x 2 tables, both branches kept
+  PASS  test_unknown_interpretation_stays_unknown              44 unknown polygons: no RIO, no invented ice type
+  PASS  test_water_polygons_are_preserved_as_water             5 water polygons -> 751,424 cells, charted, no RIO, not unknown
+
+all 19 tests passed
+     ok
+---- tests/test_route_profiles.py
+==============================================================================
+route profiles: fastest / risk_oriented / shortest_distance
+==============================================================================
+  PASS  test_a_malformed_comparison_request_is_refused                 4 malformed comparison requests refused with ProfileError
+  PASS  test_all_three_profiles_execute                                fastest=43,200 seconds; risk_oriented=193,137 configured cost units; shortest_distance=120,000 metres
+  PASS  test_every_profile_stays_inside_the_hard_constraints           all three routes stay inside the same BedMachine-style exclusion; no profile added a mask
+  PASS  test_fastest_and_shortest_distance_coincide_under_one_constant_speed same path, different objectives: 43,200 s and 120,000 m, related by the one constant speed 2.77778 m/s. They separate as soon as the speed does not.
+  PASS  test_fastest_and_shortest_do_not_inherit_the_risk_cost_as_their_objective fastest and shortest chose a route costing 247,500 against the 193,137 the risk objective found, while still reporting its exposure afterwards
+  PASS  test_fastest_has_the_least_travel_time_of_the_generated_routes fastest 12.00 h vs risk-oriented 19.31 h
+  PASS  test_fastest_route_differs_from_the_risk_oriented_route        the shortcut carries the cone and the fastest route takes it; the risk objective detours, dropping max exposure 0.850 -> 0.000
+  PASS  test_historical_mismatch_is_still_refused_for_every_profile    a 2020 chart under 2025 fields fails all three profiles with historical_date_mismatch; the override is never inherited
+  PASS  test_no_profile_creates_a_hard_block                           the fastest route crosses 5 cells inside the cone; every cost is finite and the module never writes a mask
+  PASS  test_profiles_share_start_goal_departure_and_forecast          one start (6, 0), one goal (6, 12), one departure, one speed, one mask of 25 excluded cells and one set of forecast buckets across all three
+  PASS  test_real_data_smoke_2025_01_08_three_profiles                 HISTORICAL DEMO (2020-12-24 chart over 2025-01-08 data, not an operational route) | fastest: 178.03 km, 9.89 h, cost 15,554,112, POLARIS 15,227,476, iceberg 23,371 | risk_oriented: 186.87 km, 10.38 h, cost 11,659,270, POLARIS 11,325,825, iceberg 26,476 | shortest_distance: 178.03 km, 9.89 h, cost 15,554,112, POLARIS 15,227,476, iceberg 23,371
+  PASS  test_repeated_generation_is_deterministic                      3 rebuilds: identical paths, objective values and contributions
+  PASS  test_risk_oriented_has_the_least_configured_cost_of_the_generated_routes risk-oriented 193,137 vs 247,500 for the other two; only it optimises that number
+  PASS  test_shortest_distance_has_the_least_distance_of_the_generated_routes shortest 120.00 km vs risk-oriented 193.14 km
+  PASS  test_temporal_arrival_pricing_is_still_active_in_every_profile every profile prices each cell at its own arrival bucket; the cone is 0 in bucket 0 and non-zero later on the same cells
+  PASS  test_the_comparison_carries_every_required_metric              all 18 required fields present on all three profiles
+  PASS  test_the_comparison_is_not_a_ranking_and_names_no_fuel         no ranking, recommendation, Pareto or fuel vocabulary in the code; the comparison states plainly that distance is not fuel
+  PASS  test_the_override_routes_all_three_and_is_stamped_in_the_comparison with the override asked for explicitly, all three profiles route and the comparison provenance carries the flag and both dates
+  PASS  test_the_reported_terms_reconcile_with_the_search_total        the four terms sum to the configured cost for every profile, and on the risk profile that number is plan_route's own search total
+  PASS  test_the_shortest_route_carries_more_risk_than_the_risk_oriented_one 73.14 km shorter, 127,500 of exposure against 0
+
+all 20 tests passed
+     ok
+---- tests/test_sic_forecast_raster.py
+/Users/vihaangala/Desktop/SIH/.venv/lib/python3.12/site-packages/rasterio/__init__.py:366: NotGeoreferencedWarning: The given matrix is equal to Affine.identity or its flipped counterpart. GDAL may ignore this matrix and save no geotransform without raising an error. This behavior is somewhat driver-specific.
+  dataset = writer(
+PASS  test_a_24h_forecast_raster_can_be_generated
+      sic_forecast_hgb_origin20250108_plus24h_valid20250109_3976.tif: 144,228 predicted cells, 25.91..98.87 %
+PASS  test_a_held_out_origin_is_scored_the_same_way
+      2025-12-15 (held out): HGB MAE 11.431 / RMSE 17.969 vs persistence MAE 10.647 / RMSE 18.141 on 223,516 cells
+PASS  test_a_mismatched_raster_is_rejected_not_reprojected
+      a 4x4 EPSG:4326 raster is refused, with every mismatch named
+PASS  test_a_valid_time_before_the_origin_is_refused
+      a backwards request is refused rather than mirrored
+PASS  test_invalid_input_cells_stay_invalid
+      144,228 predicted, 1,534,364 left NaN (exactly the cells whose inputs were not all finite)
+PASS  test_no_input_comes_from_after_the_forecast_origin
+      inputs sic_20250108.tif, currents_20250108.tif all <= 2025-01-08T00:00:00; a later one is refused
+PASS  test_predicted_values_stay_inside_the_physical_sic_bounds
+      144,228 cells within [0, 100]: 25.91..98.87  (clipped 0)
+PASS  test_the_forecast_is_deterministic
+      same origin, same artifact -> bit-identical field
+PASS  test_the_forecast_records_its_own_provenance
+      29 provenance fields, artifact sha 463917f386b9..., repo-relative paths only
+PASS  test_the_hindcast_is_scored_against_the_real_observation
+      132,930 cells: HGB MAE 14.988 / RMSE 22.113, persistence MAE 15.436 / RMSE 23.661   [origin inside the TRAINING period: in-sample]
+PASS  test_the_nodata_policy_is_explicit_in_the_file
+      nodata=nan, policy: NaN where the inputs were not all finite. An invalid input cell ...
+PASS  test_the_observed_archive_is_untouched
+      369 observed rasters unchanged; output under sic_forecast/
+PASS  test_the_raster_is_on_the_routing_grid
+      EPSG:3976 [1328, 1264] transform [6250.0, 0.0, -3950000.0]... identical to RoutingGrid
+PASS  test_the_resolver_cannot_be_asked_for_6h_and_handed_the_24h_field
+      refused +6h, +12h, +18h, +23h, +25h, +48h, +0.5h; only +24h is served
+PASS  test_the_resolver_does_not_substitute_persistence_or_an_observation
+      no artifact -> refused; no persistence/latest/nearest policy exists; the observation is served for its own time only
+PASS  test_the_resolver_serves_the_exact_supported_valid_time
+      +24 h resolves to sic_forecast_hgb_origin20250108_plus24h_valid20250109_3976.tif (144,228 predicted cells)
+PASS  test_the_target_field_is_never_a_feature
+      features ['sic_t', 'current_u_t', 'current_v_t', 'current_speed_t']; the t+1 field is the target only
+PASS  test_valid_time_is_origin_plus_the_models_own_lead
+      origin 2025-01-08T00:00:00 -> valid 2025-01-09T00:00:00 (+24 h), in the raster's own tags
+
+18/18 passed
+     ok
+---- tests/test_sigrid3_interpret.py
+==============================================================================
+SIGRID-3 interpretation layer -- ANTARC20201224.dbf
+==============================================================================
+  PASS  test_ct_interval_is_not_collapsed              #5  CT=13 -> 1..3/10 (exact=False)
+  PASS  test_interpretation_is_deterministic           records 0, 10, 186, 311, 334 identical on repeat interpretation
+  PASS  test_minus9_is_unused_not_zero                 #5 CC=-9 -> kind='unused' (not 0);  #5 SC=-9 -> slot omitted
+  PASS  test_normal_ice_polygon_reads_stage_from_SA    #5  SA=83 -> 'Grey White Ice' (optimistic 'Grey Ice')
+  PASS  test_partials_absent_sets_state_and_warns      #5  CA/CB/CC all -9, SA=83  ->  state=partials_absent
+  PASS  test_partials_present_are_preserved_exactly    #56  CA=10->1/10, CB=10->1/10
+  PASS  test_sa98_applies_convention_and_reads_SB      #186  SA=98 CA=40 -> iceberg 4/10; sea ice from SB=83
+  PASS  test_sa98_with_sb_missing_is_unknown           #360  SA=98 SB=-9 CT=92  ->  state=unknown
+  PASS  test_so98_sets_the_trace_iceberg_flag          #5 SO=98 -> trace flag True;  #186 SO=-9 -> False
+  PASS  test_unexpected_poly_type_fails_closed         #5 with POLY_TYPE forced to 'L'  ->  state=unknown
+  PASS  test_unlisted_stage_code_becomes_unknown       #5 with SA forced to '91' (unlisted)  ->  state=unknown
+  PASS  test_water_polygon_is_not_sea_ice              #0  CT=00  state=resolved  components=0
+  PASS  test_whole_chart_states_are_accounted_for      interval=146  partials_absent=209  resolved=281  unknown=44
+
+all 13 tests passed
+     ok
+---- tests/test_simulation.py
+Traceback (most recent call last):
+  File "/Users/vihaangala/Desktop/SIH/tests/test_simulation.py", line 26, in <module>
+    from fastapi.testclient import TestClient                              # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vihaangala/Desktop/SIH/.venv/lib/python3.12/site-packages/fastapi/testclient.py", line 1, in <module>
+    from starlette.testclient import TestClient as TestClient  # noqa
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vihaangala/Desktop/SIH/.venv/lib/python3.12/site-packages/starlette/testclient.py", line 41, in <module>
+    raise RuntimeError(
+RuntimeError: The starlette.testclient module requires the httpx2 package to be installed.
+You can install this with:
+    $ pip install httpx2
+
+     FAILED (see the log)
+---- tests/test_time_navigation_cost.py
+==============================================================================
+time-indexed navigation cost adapter
+==============================================================================
+  PASS  test_adapter_returns_the_composed_value_untouched          every lookup equals the GridComposition value bit for bit
+  PASS  test_both_branches_are_preserved_and_independently_selectable conservative 103 vs optimistic 3 on the same cell/time; neither collapsed
+  PASS  test_bucket_lookup_is_floor_of_elapsed_time                floor((t - start_time)/bucket_seconds); boundary goes to the later bucket
+  PASS  test_changing_forecast_changes_the_selected_cost           cell (0,2): 103 at bucket 0 -> 130 at bucket 1
+  PASS  test_explain_lookup_and_provenance_are_traceable           explain_lookup names the bucket, both dates and every term, and says UNAVAILABLE rather than a number when there is no field
+  PASS  test_grid_alignment_is_validated                           shape: bucket 1: shape (1, 4) != (1, 3); CRS: bucket 1: CRS EPSG:3031 != EPSG:3976; transform: bucket 1: transform[2] 5000.0 != 0.0; duplicate bucket
+  PASS  test_horizon_s_is_the_last_time_that_can_actually_be_priced horizon_s=7199.999999999999 lands in bucket 1; 7200s does not
+  PASS  test_impassable_mode_returns_inf_and_is_not_a_hard_block   +inf only for a time with no forecast; the same cell stays finite inside the horizon, so no cell is ever marked unnavigable
+  PASS  test_integration_each_cell_is_priced_at_its_own_arrival_time later arrival -> later field: (4, 1)@3.00h=bucket3:6, (4, 2)@4.00h=bucket4:6, (4, 3)@5.00h=bucket5:6  (bucket 0 would have charged 55.0)
+  PASS  test_integration_frozen_cost_routing_takes_the_other_corridor frozen -> corridor A (230,000 as planned, but 1,700,000 once each cell is priced on arrival); time-dependent -> corridor B (230,000); same grid, same solver, different routes
+  PASS  test_integration_horizon_is_refused_not_extrapolated       default: ForecastUnavailable propagates out of time_astar; impassable mode: search simply finds nothing beyond the forecast
+  PASS  test_integration_time_dependent_route_takes_the_later_cheap_corridor cost 230,000 via corridor B, 8.00 h, 9 cells
+  PASS  test_invalid_construction_is_refused                       bucket_seconds=0; negative bucket_seconds; infinite bucket_seconds; no fields; on_unavailable='use_latest' all refused
+  PASS  test_lookup_uses_arrival_time_not_departure_or_start_time  t_arrive=5400s -> 45 (bucket 1), not 27 (bucket 0 = departure/start)
+  PASS  test_min_cost_is_a_true_lower_bound_over_every_bucket      conservative min 1 holds across all buckets
+  PASS  test_nan_and_negative_costs_are_refused                    NaN and negative composed costs both refused at construction
+  PASS  test_no_cost_formula_or_policy_value_is_duplicated         only GridComposition imported from src; no penalty literals
+  PASS  test_no_hard_block_vocabulary_or_mask_is_produced          no mask, no block vocabulary, every in-horizon lookup finite
+  PASS  test_repeated_lookup_is_deterministic                      60 lookups, identical every time and across rebuilds
+  PASS  test_temporal_mismatch_is_rejected_by_default              2020-12-24 chart + 2025-01-15 environment refused by default; the override is explicit and stamped on the provider and every explanation
+  PASS  test_unavailable_bucket_raises_and_never_substitutes       a missing bucket raises ForecastUnavailable; no newest-field, previous-day, interpolated or extrapolated substitute
+
+all 21 tests passed
+     ok
+test files failed: 2

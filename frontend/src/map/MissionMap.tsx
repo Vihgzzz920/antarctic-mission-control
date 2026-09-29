@@ -11,6 +11,10 @@ import { defaults as defaultControls } from 'ol/control'
 import type { FeatureLike } from 'ol/Feature'
 
 import { GRID_EXTENT, projectProjection } from './crs'
+import type { CameraPlan } from './camera'
+import { LAYER } from './layerContract'
+import type { MapLayerId } from './layerContract'
+import { useMapCamera } from './useMapCamera'
 import { buildForecastFrame } from './ForecastLayers'
 import {
   backgroundLayers,
@@ -28,7 +32,6 @@ import {
   simulatedUncertaintyStyle,
   supersededRouteStyle,
   uncertaintySource,
-  uncertaintyStyle,
 } from './layers'
 import type {
   GeoJsonCollection,
@@ -38,12 +41,21 @@ import type {
 } from '../api/types'
 import { PROFILE_ORDER } from '../api/types'
 
+/** every on-map title comes from the contract, so the words match the legend */
+const LAYER_TITLE = Object.fromEntries(
+  Object.values(LAYER).map((descriptor) => [descriptor.id, descriptor.label]),
+) as Record<MapLayerId, string>
+
 interface Props {
   routes: Record<string, GeoJsonCollection> | null
+  /**
+   * which profiles' geometry to draw. Objectives that returned the same path
+   * are drawn once, under the profile named here; see api/routeEquivalence.ts.
+   * Null draws every profile the payload carries.
+   */
+  drawProfiles?: ProfileName[] | null
   endpoints: GeoJsonCollection | null
   exposure: GeoJsonCollection | null
-  /** the calibrated forecast radius for the exposure bucket being drawn */
-  exposureRadiusKm: number | null
   /** the route the simulation superseded, drawn behind the replanned one */
   supersededRoute: GeoJsonCollection | null
   /** the injected berg's own exposure cells, and its uncertainty radius */
@@ -54,6 +66,14 @@ interface Props {
   forecastHours: number
   /** the vessel's drawn position during transit playback */
   vessel: [number, number] | null
+  /** where this stage wants to look; see map/camera.ts */
+  camera: CameraPlan | null
+  /** exactly the layers this stage draws; see map/layerContract.ts. The
+   *  legend is built from this same list, so it cannot describe a layer that
+   *  was never added here. */
+  layers: MapLayerId[]
+  /** handed the map once, for tests and for anything that needs the instance */
+  onMapReady?: (map: Map) => void
   /** while armed, the next map click places the simulated iceberg */
   placing: boolean
   onPlace: (position: [number, number]) => void
@@ -63,15 +83,18 @@ interface Props {
 
 export default function MissionMap({
   routes,
+  drawProfiles,
   endpoints,
   exposure,
-  exposureRadiusKm,
   supersededRoute,
   simulatedExposure,
   simulatedRadiusKm,
   forecastRecords,
   forecastHours,
   vessel,
+  camera,
+  layers,
+  onMapReady,
   placing,
   onPlace,
   selected,
@@ -94,11 +117,15 @@ export default function MissionMap({
     simRing?: VectorLayer<VectorSource>
   }>({})
   const projection = useMemo(() => projectProjection(), [])
+  const shows = (id: MapLayerId) => layers.includes(id)
 
   // --- the map itself, created once -------------------------------------
   useEffect(() => {
     if (!host.current || map.current) return
     const { sic, noCoverage, land } = backgroundLayers(projection)
+    sic.set('layerId', 'sic')
+    noCoverage.set('layerId', 'no_coverage')
+    land.set('layerId', 'land')
     const instance = new Map({
       target: host.current,
       layers: [sic, noCoverage, land],
@@ -116,48 +143,52 @@ export default function MissionMap({
     })
     instance.getView().fit(GRID_EXTENT, { padding: [24, 24, 24, 24] })
     map.current = instance
+    onMapReady?.(instance)
     return () => {
       instance.setTarget(undefined)
       map.current = null
     }
+    //  eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projection])
 
-  // --- iceberg exposure, with its forecast uncertainty behind it ---------
+  //  the view is driven by the stage's camera plan from here on; the fit above
+  //  is only the opening frame while no plan has arrived yet
+  useMapCamera(map, camera)
+
+  //  the background is built once, but it still answers to the contract: a
+  //  base layer the stage does not list is hidden rather than quietly drawn
   useEffect(() => {
     const instance = map.current
     if (!instance) return
-    for (const key of ['uncertainty', 'exposure'] as const) {
-      const existing = overlayLayers.current[key]
-      if (existing) {
-        instance.removeLayer(existing)
-        overlayLayers.current[key] = undefined
+    for (const layer of instance.getLayers().getArray()) {
+      const id = layer.get('layerId') as MapLayerId | undefined
+      if (id === 'sic' || id === 'no_coverage' || id === 'land') {
+        layer.setVisible(layers.includes(id))
       }
     }
-    if (!exposure) return
+  }, [layers])
 
-    if (exposureRadiusKm && exposureRadiusKm > 0) {
-      const rings = new VectorLayer({
-        source: uncertaintySource(
-          exposure as { features: Array<Record<string, unknown>> },
-          exposureRadiusKm,
-        ),
-        style: uncertaintyStyle,
-        zIndex: 4,
-      })
-      rings.set('title', 'Forecast uncertainty radius')
-      instance.addLayer(rings)
-      overlayLayers.current.uncertainty = rings
+  // --- the exposure field the router priced against ----------------------
+  useEffect(() => {
+    const instance = map.current
+    if (!instance) return
+    const existing = overlayLayers.current.exposure
+    if (existing) {
+      instance.removeLayer(existing)
+      overlayLayers.current.exposure = undefined
     }
+    if (!exposure || !shows('iceberg_exposure')) return
 
     const layer = new VectorLayer({
       source: geoJsonSource(exposure, projection),
       style: icebergStyle,
       zIndex: 6,
     })
-    layer.set('title', 'Modelled iceberg exposure')
+    layer.set('layerId', 'iceberg_exposure')
+    layer.set('title', LAYER_TITLE.iceberg_exposure)
     instance.addLayer(layer)
     overlayLayers.current.exposure = layer
-  }, [exposure, exposureRadiusKm, projection])
+  }, [exposure, layers, projection])
 
   // --- one vector layer per profile -------------------------------------
   useEffect(() => {
@@ -169,6 +200,11 @@ export default function MissionMap({
     PROFILE_ORDER.forEach((name) => {
       const collection = routes[name]
       if (!collection) return
+      //  one line per distinct geometry: a profile whose path another profile
+      //  already draws is left off rather than stacked on top of it
+      if (drawProfiles && !drawProfiles.includes(name)) return
+      const isSelected = name === selected
+      if (!shows(isSelected ? 'selected_route' : 'alternate_routes')) return
       const layer = new VectorLayer({
         source: geoJsonSource(collection, projection),
         style: (feature: FeatureLike) =>
@@ -177,11 +213,12 @@ export default function MissionMap({
             : cellStyle(name === selected, name),
       })
       layer.set('profile', name)
-      layer.setZIndex(name === selected ? 30 : 9)
+      layer.set('layerId', isSelected ? 'selected_route' : 'alternate_routes')
+      layer.setZIndex(isSelected ? 30 : 9)
       instance.addLayer(layer)
       routeLayers.current[name] = layer
     })
-  }, [routes, projection, selected])
+  }, [drawProfiles, routes, layers, projection, selected])
 
   // restyle without rebuilding when only the selection changes
   useEffect(() => {
@@ -204,7 +241,7 @@ export default function MissionMap({
       instance.removeLayer(overlayLayers.current.superseded)
       overlayLayers.current.superseded = undefined
     }
-    if (!supersededRoute) return
+    if (!supersededRoute || !shows('superseded_route')) return
     const layer = new VectorLayer({
       source: geoJsonSource(supersededRoute, projection),
       style: (feature: FeatureLike) =>
@@ -213,10 +250,11 @@ export default function MissionMap({
           : new Style({}),
       zIndex: 18,
     })
-    layer.set('title', 'Current route, superseded')
+    layer.set('layerId', 'superseded_route')
+    layer.set('title', LAYER_TITLE.superseded_route)
     instance.addLayer(layer)
     overlayLayers.current.superseded = layer
-  }, [supersededRoute, projection])
+  }, [supersededRoute, layers, projection])
 
   // --- the injected iceberg and its uncertainty ---------------------------
   useEffect(() => {
@@ -231,7 +269,11 @@ export default function MissionMap({
     }
     if (!simulatedExposure) return
 
-    if (simulatedRadiusKm && simulatedRadiusKm > 0) {
+    if (
+      simulatedRadiusKm &&
+      simulatedRadiusKm > 0 &&
+      shows('simulated_envelope')
+    ) {
       const ring = new VectorLayer({
         source: uncertaintySource(
           simulatedExposure as { features: Array<Record<string, unknown>> },
@@ -240,20 +282,23 @@ export default function MissionMap({
         style: simulatedUncertaintyStyle,
         zIndex: 43,
       })
-      ring.set('title', 'Simulated iceberg uncertainty radius')
+      ring.set('layerId', 'simulated_envelope')
+      ring.set('title', LAYER_TITLE.simulated_envelope)
       instance.addLayer(ring)
       overlayLayers.current.simRing = ring
     }
 
+    if (!shows('simulated_iceberg')) return
     const layer = new VectorLayer({
       source: geoJsonSource(simulatedExposure, projection),
       style: simulatedIcebergStyle,
       zIndex: 44,
     })
-    layer.set('title', 'SIMULATED ICEBERG')
+    layer.set('layerId', 'simulated_iceberg')
+    layer.set('title', LAYER_TITLE.simulated_iceberg)
     instance.addLayer(layer)
     overlayLayers.current.simBerg = layer
-  }, [simulatedExposure, simulatedRadiusKm, projection])
+  }, [simulatedExposure, simulatedRadiusKm, layers, projection])
 
   // --- departure / destination -------------------------------------------
   useEffect(() => {
@@ -263,15 +308,17 @@ export default function MissionMap({
       instance.removeLayer(overlayLayers.current.endpoints)
       overlayLayers.current.endpoints = undefined
     }
-    if (!endpoints) return
+    if (!endpoints || !shows('endpoints')) return
     const layer = new VectorLayer({
       source: geoJsonSource(endpoints, projection),
       style: endpointStyle,
       zIndex: 60,
     })
+    layer.set('layerId', 'endpoints')
+    layer.set('title', LAYER_TITLE.endpoints)
     instance.addLayer(layer)
     overlayLayers.current.endpoints = layer
-  }, [endpoints, projection])
+  }, [endpoints, layers, projection])
 
   // --- forecast playback ---------------------------------------------------
   useEffect(() => {
@@ -287,36 +334,38 @@ export default function MissionMap({
     if (!forecastRecords || forecastRecords.length === 0) return
 
     const frame = buildForecastFrame(forecastRecords, forecastHours)
-    const tracks = new VectorLayer({
+    const add = (
+      id: 'forecast_track' | 'forecast_envelope' | 'observed_icebergs' |
+          'predicted_icebergs',
+      key: 'fcTracks' | 'fcRings' | 'fcObserved' | 'fcPredicted',
+      layer: VectorLayer<VectorSource>,
+    ) => {
+      if (!shows(id)) return
+      layer.set('layerId', id)
+      layer.set('title', LAYER_TITLE[id])
+      instance.addLayer(layer)
+      overlayLayers.current[key] = layer
+    }
+
+    add('forecast_track', 'fcTracks', new VectorLayer({
       source: frame.tracks, style: driftTrackStyle, zIndex: 32,
-    })
-    const rings = new VectorLayer({
+    }))
+    add('forecast_envelope', 'fcRings', new VectorLayer({
       source: frame.rings,
       style: (feature: FeatureLike) =>
         forecastRingStyle(Boolean(feature.get('extrapolated'))),
       zIndex: 33,
-    })
-    const observed = new VectorLayer({
+    }))
+    add('observed_icebergs', 'fcObserved', new VectorLayer({
       source: frame.observed, style: observedIcebergStyle, zIndex: 34,
-    })
-    const predicted = new VectorLayer({
+    }))
+    add('predicted_icebergs', 'fcPredicted', new VectorLayer({
       source: frame.predicted,
       style: (feature: FeatureLike) =>
         predictedIcebergStyle(Boolean(feature.get('extrapolated'))),
       zIndex: 36,
-    })
-    tracks.set('title', 'Observed to predicted')
-    observed.set('title', 'Observed positions')
-    predicted.set('title', 'Predicted positions')
-    rings.set('title', 'Forecast uncertainty radius')
-    for (const layer of [tracks, rings, observed, predicted]) {
-      instance.addLayer(layer)
-    }
-    overlayLayers.current.fcTracks = tracks
-    overlayLayers.current.fcRings = rings
-    overlayLayers.current.fcObserved = observed
-    overlayLayers.current.fcPredicted = predicted
-  }, [forecastRecords, forecastHours])
+    }))
+  }, [forecastRecords, forecastHours, layers])
 
   // --- the vessel during transit playback ---------------------------------
   useEffect(() => {
@@ -326,7 +375,7 @@ export default function MissionMap({
       instance.removeLayer(overlayLayers.current.vessel)
       overlayLayers.current.vessel = undefined
     }
-    if (!vessel) return
+    if (!vessel || !shows('vessel')) return
     const layer = new VectorLayer({
       source: new VectorSource({
         features: [new Feature({ geometry: new Point(vessel) })],
@@ -334,10 +383,11 @@ export default function MissionMap({
       style: vesselStyle,
       zIndex: 60,
     })
-    layer.set('title', 'Vessel')
+    layer.set('layerId', 'vessel')
+    layer.set('title', LAYER_TITLE.vessel)
     instance.addLayer(layer)
     overlayLayers.current.vessel = layer
-  }, [vessel])
+  }, [vessel, layers])
 
   // --- clicking a route cell --------------------------------------------
   useEffect(() => {
@@ -384,6 +434,7 @@ export default function MissionMap({
       className={`map-canvas${placing ? ' is-placing' : ''}`}
       ref={host}
       data-testid="mission-map"
+      data-layers={layers.join(' ')}
     />
   )
 }

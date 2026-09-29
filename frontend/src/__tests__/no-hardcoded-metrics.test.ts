@@ -35,6 +35,17 @@ const METRIC_KEYS = [
   'indeterminate_cells',
 ]
 
+/** Every index at which `needle` occurs in `haystack`. */
+function occurrences(haystack: string, needle: string): number[] {
+  const out: number[] = []
+  let at = haystack.indexOf(needle)
+  while (at !== -1) {
+    out.push(at)
+    at = haystack.indexOf(needle, at + needle.length)
+  }
+  return out
+}
+
 describe('no hardcoded route metrics', () => {
   const files = sources(SRC)
 
@@ -59,8 +70,54 @@ describe('no hardcoded route metrics', () => {
     for (const file of files) {
       const code = readFileSync(file, 'utf8').toLowerCase()
       expect(code, `${file} calls a route safest`).not.toContain('safest')
-      expect(code, `${file} mentions fuel`).not.toContain('fuel')
+      //  A `fuel_efficient` objective now exists and is backed by
+      //  src/routing/fuel_cost.py, so the bare word is no longer forbidden.
+      //  What stays forbidden is every UNSUPPORTED fuel claim: this project
+      //  produces an ESTIMATED relative proxy in open-water-equivalent metres
+      //  and cannot produce a measured consumption, a saving, or any mass or
+      //  volume. Distance is still not fuel.
+      for (const claim of [
+        'measured fuel',
+        'actual fuel',
+        'fuel saving',
+        'saves fuel',
+        'fuel consumption of',
+        'litres',
+        'tonnes',
+        'bunker',
+      ]) {
+        //  A phrase is a CLAIM only where it is not denied. The UI is required
+        //  to state "Measured fuel consumption: no" -- which is the opposite
+        //  of claiming one -- so an occurrence sitting next to a negation is
+        //  the disclosure, not the claim.
+        for (const at of occurrences(code, claim)) {
+          //  the disclosure reads "Measured fuel consumption: {...? 'yes' : 'no'}",
+          //  so the denial sits AFTER the phrase, across a JSX expression
+          const around = code.slice(Math.max(0, at - 40), at + claim.length + 160)
+          const denied = /\bno\b|\bnot\b|never|unavailable|false|cannot/.test(
+            around,
+          )
+          expect(
+            denied,
+            `${file} makes an unsupported fuel claim: ...${around.trim()}...`,
+          ).toBe(true)
+        }
+      }
       expect(code, `${file} ranks the routes`).not.toContain('best route')
+      expect(code, `${file} ranks the routes`).not.toContain('optimal route')
+      expect(code, `${file} ranks the routes`).not.toContain('recommended route')
+    }
+  })
+
+  it('calls no route option a duplicate of another', () => {
+    //  two objectives can return the same path; one of them is not a copy of
+    //  the other, and the operator-facing words never say it is
+    for (const file of files) {
+      const code = readFileSync(file, 'utf8').toLowerCase()
+      expect(code, `${file} calls a route a duplicate`).not.toContain('duplicate')
+      expect(code, `${file} claims the objectives always agree`).not.toContain(
+        'always identical',
+      )
     }
   })
 })

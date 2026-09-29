@@ -17,6 +17,9 @@ from datetime import datetime
 
 import numpy as np
 
+import hashlib
+import json
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -26,8 +29,12 @@ from src.routing.navigation_domain import NavigationDomain
 from src.routing.route_profiles import PROFILES, ProfileError, compare_profiles
 
 from src.api import forecast, geo, simulate
-from src.api.config import BEDMACHINE, DEMO, USNIC, demo_departure
-from src.api.world import WorldError, fresh_grid, get_world, grid_info
+from src.api.config import (BEDMACHINE, DEMO, ROOT, USNIC,
+                            demo_departure)
+from src.api.mission_decision import (NO_FEASIBLE_OPTION, SUPPORTED_POLICIES,
+                                      MissionError, Site, evaluate_mission)
+from src.api.world import (WorldError, fresh_grid, get_world, grid_info,
+                           sic_for_bucket)
 
 STATUS_OK = "ok"
 STATUS_UNAVAILABLE = "backend_data_unavailable"
@@ -46,6 +53,40 @@ class SimulatedIceberg(BaseModel):
 
     x: float
     y: float
+
+
+class CandidateSite(BaseModel):
+    """One candidate destination. The caller says where it came from and
+    whether it is a real operational location; the server never assumes it."""
+
+    site_id: str
+    cell: list[int] = Field(..., min_length=2, max_length=2)
+    label: str = ""
+    is_operational: bool = False
+    source: str = "supplied by the caller"
+
+
+class MissionEvaluateRequest(BaseModel):
+    """Everything the mission-decision layer needs, stated explicitly.
+
+    Nothing important is hidden in a server default: the start, the candidate
+    destinations, the departure times and the profiles are all required, so a
+    caller cannot get a matrix without having said what it is a matrix OF.
+    """
+
+    start: list[int] = Field(..., min_length=2, max_length=2)
+    sites: list[CandidateSite] = Field(..., min_length=1)
+    departure_times: list[str] = Field(..., min_length=1)
+    profiles: list[str] = Field(..., min_length=1)
+    vessel_speed_mps: float = DEMO["vessel_speed_mps"]
+    polaris_ice_class: str = DEMO["polaris_ice_class"]
+    polaris_riv_table: str = DEMO["polaris_riv_table"]
+    #  OPT-IN and explicit. Omitted -> the shipped demo policy, unchanged.
+    #  Named -> that exact policy or a structured refusal; never a substitute.
+    environment_policy: str | None = None
+    #  supplying a horizon longer than the world's own provider puts the run in
+    #  long-horizon EVALUATION mode, where the iceberg term is omitted
+    horizon_buckets: int | None = None
 
 
 class MissionRequest(BaseModel):
@@ -106,6 +147,7 @@ def _run(request: MissionRequest, provider=None) -> dict:
             polaris_ice_class=request.polaris_ice_class,
             polaris_riv_table=request.polaris_riv_table,
             polaris_penalties=world["polaris"],
+            sic_for_bucket=sic_for_bucket(),
             allow_historical_demo_override=request.historical_demo_override)
     except (ProfileError, RouteError) as exc:
         raise HTTPException(status_code=422, detail={
@@ -205,6 +247,101 @@ def iceberg_exposure(bucket: int = Query(1, ge=0)) -> dict:
             "message": f"exposure buckets available: {sorted(fields)}"})
     return geo.exposure_collection(world["grid"], fields[bucket],
                                    world["grid"].crs.to_epsg())
+
+
+@app.get("/api/evaluation/historical")
+def historical_evaluation() -> dict:
+    """The held-out historical forecast -> decision backtest, as produced.
+
+    Serialisation only: the file is read and returned. No number is recomputed
+    here, and nothing is summarised in a way the artifact does not already say.
+    It is EVIDENCE about the origins and geometry it was run on, not a claim
+    that forecast-driven routing is better.
+    """
+    path = (ROOT / "data" / "processed" / "evaluation"
+            / "historical_forecast_decision_backtest.json")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail={
+            "status": "evaluation_artifact_unavailable",
+            "message": "the historical backtest artifact has not been "
+                       "produced; run "
+                       "python -m src.evaluation.historical_forecast_decision"})
+    try:
+        body = json.loads(path.read_text())
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail={
+            "status": "evaluation_artifact_unreadable",
+            "message": str(exc)}) from exc
+    return {"status": STATUS_OK,
+            "artifact": str(path.relative_to(ROOT)),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "evaluation": body}
+
+
+@app.post("/api/mission/evaluate")
+def mission_evaluate(request: MissionEvaluateRequest) -> dict:
+    """Evaluate several destinations at several departure times.
+
+    Returns one result per (site, departure time) pair with its measured
+    attributes, or the router's own refusal. It does NOT rank the sites, rank
+    the departure times, name a best option or compute a score.
+    """
+    try:
+        world = get_world()
+    except WorldError as exc:
+        raise HTTPException(status_code=503, detail={
+            "status": STATUS_UNAVAILABLE, "message": str(exc)}) from exc
+
+    #  An unsupported policy is REFUSED, never replaced with a supported one.
+    if request.environment_policy is not None and \
+            request.environment_policy not in SUPPORTED_POLICIES:
+        raise HTTPException(status_code=422, detail={
+            "status": "rejected",
+            "message": f"{request.environment_policy!r} is not a policy this "
+                       f"backend routes under. Supported: "
+                       f"{list(SUPPORTED_POLICIES)}. The requested policy is "
+                       f"refused rather than replaced.",
+            "supported_policies": list(SUPPORTED_POLICIES)})
+    try:
+        departures = [datetime.fromisoformat(t) for t in request.departure_times]
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={
+            "status": "bad_request",
+            "message": f"a departure_time is not an ISO timestamp: {exc}"}) from exc
+
+    sites = tuple(Site(site_id=s.site_id, cell=(int(s.cell[0]), int(s.cell[1])),
+                       label=s.label or s.site_id,
+                       is_operational=bool(s.is_operational), source=s.source)
+                  for s in request.sites)
+    try:
+        matrix = evaluate_mission(
+            sites=sites, departure_times=departures,
+            start=(int(request.start[0]), int(request.start[1])),
+            vessel_speed_mps=request.vessel_speed_mps,
+            polaris_ice_class=request.polaris_ice_class,
+            polaris_riv_table=request.polaris_riv_table,
+            profiles=tuple(request.profiles),
+            environment_policy=request.environment_policy,
+            horizon_buckets=request.horizon_buckets, world=world)
+    except (MissionError, ProfileError, RouteError) as exc:
+        raise HTTPException(status_code=422, detail={
+            "status": "rejected", "message": str(exc)}) from exc
+
+    payload = matrix.to_dict()
+    summary = payload["summary"]
+    return {"status": (STATUS_OK if matrix.any_feasible else NO_FEASIBLE_OPTION),
+            "message": ("no candidate destination routed at any requested "
+                        "departure time" if not matrix.any_feasible else
+                        f"{summary['options_feasible']} of "
+                        f"{summary['options_evaluated']} options routed"),
+            #  surfaced at the top, not only nested inside the routes
+            "environment_policy": matrix.environment_policy,
+            "evaluation_mode": matrix.evaluation_mode,
+            "is_operational_assessment": matrix.is_operational_assessment,
+            "iceberg_exposure": matrix.iceberg_exposure,
+            "limitations": list(matrix.limitations),
+            "mission": payload,
+            "grid": grid_info()}
 
 
 @app.post("/api/mission/simulate")

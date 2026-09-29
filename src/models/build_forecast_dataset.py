@@ -1,5 +1,13 @@
 """
-Build the 1-day-ahead SIC forecasting dataset: day t predicts SIC on day t+1.
+Build the N-day-ahead SIC forecasting dataset: day t predicts SIC on day t+N.
+
+The default is N = 1 (a 24 h lead), which is what the shipped model was
+trained on and what --lead-days leaves untouched when it is not given. Longer
+leads are supported because the archive genuinely contains their targets --
+361 usable (t, t+2) pairs, for instance -- and a lead must have a real target
+before any model may claim it. Sub-daily leads are NOT supported at any
+setting: both sea-ice sources in this project are daily composites, so there is
+no 6 h or 12 h target to build, and --lead-days therefore takes whole days.
 
 Rows are (pixel, day) pairs. Per row:
     features  sic_t, current_u_t, current_v_t, current_speed_t
@@ -61,6 +69,10 @@ ROOT = Path(__file__).resolve().parents[2]
 CURRENTS_DIR = ROOT / "data" / "processed" / "currents"
 OUT_PATH = ROOT / "data" / "processed" / "forecast_dataset.npz"
 
+#  the archive's cadence: one field per day, so a lead is a whole number of
+#  days. This is a property of the DATA, not a configuration choice.
+SOURCE_CADENCE_DAYS = 1
+
 FEATURE_NAMES = ["sic_t", "current_u_t", "current_v_t", "current_speed_t"]
 N_FEATURES = len(FEATURE_NAMES)
 
@@ -85,8 +97,15 @@ def _day_from_stem(stem: str, prefix: str) -> date | None:
         return None
 
 
-def list_pairs(sic_dir: Path, cur_dir: Path, gap_days: int) -> list[tuple[date, date, str]]:
-    """Every (base, target, split) with a true 1-day step and all three files present."""
+def list_pairs(sic_dir: Path, cur_dir: Path, gap_days: int,
+               lead_days: int = SOURCE_CADENCE_DAYS) -> list[tuple[date, date, str]]:
+    """Every (base, target, split) with a true `lead_days` step and all three
+    files present. A missing archive day removes the pairs that would have
+    spanned it rather than producing a mislabelled longer forecast."""
+    if not isinstance(lead_days, int) or lead_days < 1:
+        raise ValueError(f"lead_days must be a whole number of days >= 1, got "
+                         f"{lead_days!r}. The sea-ice archive is daily, so a "
+                         f"sub-daily lead has no target to train against.")
     sic_days = sorted(d for d in (_day_from_stem(p.stem, "sic_")
                                   for p in sic_dir.glob("sic_*.tif")) if d)
     have_sic = set(sic_days)
@@ -95,7 +114,7 @@ def list_pairs(sic_dir: Path, cur_dir: Path, gap_days: int) -> list[tuple[date, 
 
     pairs: list[tuple[date, date, str]] = []
     for base in sic_days:
-        target = base + timedelta(days=1)
+        target = base + timedelta(days=lead_days)
         if target not in have_sic or base not in have_cur:
             continue                      # missing archive day, or no currents for t
         s = split_of(base)
@@ -111,6 +130,7 @@ def list_pairs(sic_dir: Path, cur_dir: Path, gap_days: int) -> list[tuple[date, 
 
 
 def load_day(base: date, target: date, sic_dir: Path, cur_dir: Path, stride: int):
+    #  features come from `base` only; `target` is opened for the LABEL alone
     """Return the five strided 2-D fields for one pair, or None if a file is bad."""
     sic_t = load_sic(sic_dir / f"sic_{base:%Y%m%d}.tif").sic[::stride, ::stride]
     sic_t1 = load_sic(sic_dir / f"sic_{target:%Y%m%d}.tif").sic[::stride, ::stride]
@@ -132,19 +152,21 @@ def valid_mask(sic_t, u, v, sic_t1) -> np.ndarray:
 
 
 def build(sic_dir: Path, cur_dir: Path, out_path: Path,
-          stride: int, max_gb: float, gap_days: int) -> int:
-    pairs = list_pairs(sic_dir, cur_dir, gap_days)
+          stride: int, max_gb: float, gap_days: int,
+          lead_days: int = SOURCE_CADENCE_DAYS) -> int:
+    pairs = list_pairs(sic_dir, cur_dir, gap_days, lead_days)
     if not pairs:
         print(f"No usable (t, t+1) pairs found.\n"
               f"  SIC      : {sic_dir}\n  currents : {cur_dir}", file=sys.stderr)
         return 1
 
     print("=" * 74)
-    print("1-DAY-AHEAD SIC FORECAST DATASET   features(t) -> sic(t+1)")
+    print(f"{lead_days}-DAY-AHEAD SIC FORECAST DATASET   features(t) -> "
+          f"sic(t+{lead_days})   [+{lead_days * 24} h lead]")
     print("=" * 74)
     print(f"  features   : {', '.join(FEATURE_NAMES)}")
     print(f"  target     : sic_t1")
-    print(f"  pairs      : {len(pairs)} true consecutive-day pairs")
+    print(f"  pairs      : {len(pairs)} true {lead_days}-day-step pairs")
     print(f"  stride     : {stride}" + ("" if stride == 1 else "  (grid subsampled)"))
     if gap_days:
         print(f"  gap-days   : {gap_days}  (pairs straddling a split boundary dropped)")
@@ -220,6 +242,8 @@ def build(sic_dir: Path, cur_dir: Path, out_path: Path,
         "feature_names": np.array(FEATURE_NAMES),
         "stride": np.array(stride),
         "gap_days": np.array(gap_days),
+        "lead_days": np.array(lead_days),
+        "lead_hours": np.array(lead_days * 24),
     }
     for s in SPLITS:
         payload[f"X_{s}"] = X[s]
@@ -234,8 +258,8 @@ def build(sic_dir: Path, cur_dir: Path, out_path: Path,
             [str(min(dates_by_split[s])), str(max(dates_by_split[s]))], dtype="U10"
         ) if dates_by_split[s] else np.array(["", ""], dtype="U10")
         payload[f"{s}_target_range"] = np.array(
-            [str(min(dates_by_split[s]) + timedelta(days=1)),
-             str(max(dates_by_split[s]) + timedelta(days=1))], dtype="U10"
+            [str(min(dates_by_split[s]) + timedelta(days=lead_days)),
+             str(max(dates_by_split[s]) + timedelta(days=lead_days))], dtype="U10"
         ) if dates_by_split[s] else np.array(["", ""], dtype="U10")
 
     print(f"\nWriting {out_path} ...")
@@ -265,13 +289,18 @@ if __name__ == "__main__":
                     help="abort before allocating if the dataset exceeds this")
     ap.add_argument("--gap-days", type=int, default=0, choices=(0, 1),
                     help="1 drops pairs whose target falls in the next split")
+    ap.add_argument("--lead-days", type=int, default=SOURCE_CADENCE_DAYS,
+                    help="forecast lead in WHOLE DAYS (default 1 = +24 h). "
+                         "The archive is daily; sub-daily leads have no target.")
     args = ap.parse_args()
 
     if args.stride < 1:
         ap.error("--stride must be >= 1")
+    if args.lead_days < 1:
+        ap.error("--lead-days must be a whole number of days >= 1")
     try:
         code = build(Path(args.sic_dir), Path(args.currents_dir), Path(args.out),
-                     args.stride, args.max_gb, args.gap_days)
+                     args.stride, args.max_gb, args.gap_days, args.lead_days)
     except (ValueError, FileNotFoundError) as exc:
         print(f"\nCANNOT BUILD THE DATASET\n\n{exc}\n", file=sys.stderr)
         code = 1

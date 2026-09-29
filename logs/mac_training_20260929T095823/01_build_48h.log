@@ -1,0 +1,45 @@
+==========================================================================
+2-DAY-AHEAD SIC FORECAST DATASET   features(t) -> sic(t+2)   [+48 h lead]
+==========================================================================
+  features   : sic_t, current_u_t, current_v_t, current_speed_t
+  target     : sic_t1
+  pairs      : 357 true 2-day-step pairs
+  stride     : 1
+  gap-days   : 1  (pairs straddling a split boundary dropped)
+
+Pass 1/2: counting valid rows over 357 pair(s)...
+  50/357 pairs scanned
+  100/357 pairs scanned
+  150/357 pairs scanned
+  200/357 pairs scanned
+  250/357 pairs scanned
+  300/357 pairs scanned
+  350/357 pairs scanned
+  357/357 pairs scanned
+
+split      pairs            rows        size
+--------------------------------------------
+train        269      61,599,018       1.23G
+val           59      21,599,825       0.43G
+test          29       6,314,231       0.13G
+--------------------------------------------
+TOTAL        357      89,513,074       1.79G
+
+Pass 2/2: filling 89,513,074 rows...
+  50/357 pairs written
+  100/357 pairs written
+  150/357 pairs written
+  200/357 pairs written
+  250/357 pairs written
+  300/357 pairs written
+  350/357 pairs written
+  357/357 pairs written
+
+Writing data/processed/forecast_dataset_48h.npz ...
+
+GOT     forecast_dataset_48h.npz  (1.79 GB)
+  X_train  (61599018, 4)   base 2025-01-01 .. 2025-09-28   target 2025-01-03 .. 2025-09-30
+  X_val    (21599825, 4)   base 2025-10-01 .. 2025-11-28   target 2025-10-03 .. 2025-11-30
+  X_test   (6314231, 4)   base 2025-12-01 .. 2025-12-29   target 2025-12-03 .. 2025-12-31
+
+No shuffling, no interpolation, no model. Splits are chronological on the base date t.

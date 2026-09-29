@@ -28,6 +28,7 @@ import type { ProfileName } from '../api/types'
 
 export const PROFILE_COLOUR: Record<ProfileName, string> = {
   fastest: '#4cd7f5',
+  fuel_efficient: '#c9a7ff',
   risk_oriented: '#8ef2a6',
   shortest_distance: '#ffc857',
 }
@@ -131,6 +132,7 @@ export function icebergStyle(feature: FeatureLike) {
  */
 const DASH: Record<ProfileName, number[] | undefined> = {
   fastest: undefined,
+  fuel_efficient: [9, 4, 2, 4],
   risk_oriented: [14, 6],
   shortest_distance: [3, 5],
 }
@@ -300,30 +302,32 @@ export function supersededRouteStyle(): Style[] {
 
 // ────────────────────────────────────── forecast playback and vessel
 /** Observed positions: hollow, cool, clearly the model's INPUT. */
+/** Observed positions: SOLID -- a recorded fact, grounded on the chart. */
 export const observedIcebergStyle = new Style({
   image: new RegularShape({
     points: 3,
-    radius: 5,
-    fill: new Fill({ color: 'rgba(8, 14, 20, 0.85)' }),
-    stroke: new Stroke({ color: 'rgba(150, 205, 235, 0.9)', width: 1.2 }),
+    radius: 5.5,
+    fill: new Fill({ color: 'rgba(226, 242, 255, 0.92)' }),
+    stroke: new Stroke({ color: 'rgba(120, 190, 220, 0.95)', width: 1 }),
   }),
   zIndex: 34,
 })
 
-/** Predicted positions: filled, and amber-tinged once extrapolated. */
+/**
+ * Predicted positions: OUTLINED -- a projection, not an observation, and so
+ * deliberately hollow beside the solid observed mark. Amber once the horizon
+ * runs past the calibration.
+ */
 export function predictedIcebergStyle(extrapolated: boolean): Style {
   return new Style({
     image: new RegularShape({
       points: 3,
-      radius: 6,
-      fill: new Fill({
-        color: extrapolated
-          ? 'rgba(255, 176, 32, 0.8)'
-          : 'rgba(216, 240, 255, 0.86)',
-      }),
+      radius: 6.5,
+      fill: new Fill({ color: 'rgba(5, 9, 13, 0.55)' }),
       stroke: new Stroke({
-        color: extrapolated ? '#ffd489' : 'rgba(120, 190, 220, 0.9)',
-        width: 1.1,
+        color: extrapolated ? '#ffc857' : 'rgba(150, 205, 235, 0.95)',
+        width: 1.6,
+        lineDash: extrapolated ? [3, 2] : undefined,
       }),
     }),
     zIndex: 36,

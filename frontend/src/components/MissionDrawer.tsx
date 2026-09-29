@@ -86,6 +86,12 @@ export default function MissionDrawer({ value, onChange, grid, busy }: Props) {
                 set('departure_time', `${event.target.value}:00`)
               }
             />
+            {!value.departure_time && (
+              <em className="field-note" data-testid="departure-unknown">
+                Unknown — waiting for the demonstration's own departure time
+                from the backend. Nothing is assumed in its place.
+              </em>
+            )}
           </label>
 
           <div className="field-pair">

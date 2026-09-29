@@ -1,0 +1,3 @@
+old artifact sha256 : 463917f386b92e6e996506504c3662dfb0b5f828fec08c0f68e6159ed0f3682a
+kept a copy at      : data/processed/forecast_model_hgb_pre_sklearn191.joblib
+kept a copy at      : data/processed/forecast_metrics_pre_sklearn191.json

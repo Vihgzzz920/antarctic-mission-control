@@ -11,6 +11,8 @@ interface Props {
   label?: string
   whyOpen: boolean
   onWhy: () => void
+  /** the label on that trailing action; the route drawer by default */
+  whyLabel?: string
   transit?: React.ReactNode
 }
 
@@ -21,6 +23,7 @@ export default function SelectedRouteBar({
   label = 'Selected route',
   whyOpen,
   onWhy,
+  whyLabel = 'Why this route',
   transit,
 }: Props) {
   const route = comparison.profiles[profile]
@@ -58,7 +61,7 @@ export default function SelectedRouteBar({
         aria-expanded={whyOpen}
         data-testid="why-toggle"
       >
-        Why this route
+        {whyLabel}
       </button>
     </div>
   )

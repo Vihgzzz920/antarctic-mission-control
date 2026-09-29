@@ -63,6 +63,12 @@ Important benchmark figures already obtained:
 - HGB test: MAE 11.073 percentage points, RMSE 17.818, R² 0.5694.
 - MIZ errors are materially larger than open-water / easier regimes, which is important for honest uncertainty communication.
 
+The HGB model can now be written out as a forecast raster on the routing grid
+(`python -m src.models.forecast_sic_raster --origin YYYY-MM-DD`). Its lead is 24 h,
+the router's buckets are 6 h and the demonstration route is under 10 h, so the demo
+does **not** consume that field yet and still prices sea ice from the departure-day
+analysis. See `docs/sic_forecast_pipeline.md` for the pipeline and the gap.
+
 ### Ocean currents
 
 - Copernicus GLORYS12V1 daily 2025 currents processed to the project CRS/grid.

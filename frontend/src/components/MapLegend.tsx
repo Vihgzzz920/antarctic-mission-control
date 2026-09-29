@@ -1,63 +1,42 @@
-import { PROFILE_LABEL, PROFILE_ORDER } from '../api/types'
-import type { ProfileName } from '../api/types'
-import { PROFILE_COLOUR } from '../map/layers'
+import type { LegendEntry } from '../map/layerContract'
 
 interface Props {
-  selected: ProfileName | null
-  hasRoutes: boolean
-  simulated?: boolean
+  /** built by map/layerContract.legendEntries from the SAME list of layer ids
+   *  the map was given, so every row here is a layer that was drawn */
+  entries: LegendEntry[]
 }
 
-export default function MapLegend({ selected, hasRoutes, simulated }: Props) {
+/** The mark for a row, matching how that layer is drawn on the map. */
+function Swatch({ entry }: { entry: LegendEntry }) {
+  if (entry.swatch === 'line' || entry.swatch === 'dashed') {
+    return (
+      <span
+        className={`legend-mark legend-${entry.swatch}`}
+        style={entry.colour ? { background: entry.colour } : undefined}
+        aria-hidden="true"
+      />
+    )
+  }
+  return <span className={`legend-mark legend-${entry.swatch}`} aria-hidden="true" />
+}
+
+export default function MapLegend({ entries }: Props) {
+  if (entries.length === 0) return null
   return (
     <div className="legend" data-testid="map-legend">
-      {hasRoutes && (
-        <div className="legend-group">
-          {PROFILE_ORDER.map((name) => (
-            <span
-              key={name}
-              className={`legend-row${name === selected ? ' is-active' : ''}`}
-            >
-              <span
-                className="legend-line"
-                style={{ background: PROFILE_COLOUR[name] }}
-                aria-hidden="true"
-              />
-              {PROFILE_LABEL[name]}
-            </span>
-          ))}
-        </div>
-      )}
-      {simulated && (
-        <div className="legend-group">
-          <span className="legend-row is-active">
-            <span className="legend-swatch legend-sim" aria-hidden="true" />
-            Simulated iceberg
+      {entries.map((entry) => (
+        <span
+          key={entry.key}
+          className={`legend-row${entry.emphasis ? ' is-active' : ''}`}
+          data-layer={entry.layer}
+        >
+          <Swatch entry={entry} />
+          <span className="legend-text">
+            {entry.label}
+            {entry.note && <i>{entry.note}</i>}
           </span>
-          <span className="legend-row">
-            <span className="legend-line legend-superseded" aria-hidden="true" />
-            Current route, superseded
-          </span>
-        </div>
-      )}
-      <div className="legend-group">
-        <span className="legend-row">
-          <span className="legend-swatch legend-berg" aria-hidden="true" />
-          Modelled iceberg exposure
         </span>
-        <span className="legend-row">
-          <span className="legend-swatch legend-cone" aria-hidden="true" />
-          Forecast uncertainty radius
-        </span>
-        <span className="legend-row">
-          <span className="legend-swatch legend-land" aria-hidden="true" />
-          Land and grounded ice
-        </span>
-        <span className="legend-row">
-          <span className="legend-swatch legend-sic" aria-hidden="true" />
-          Sea-ice concentration
-        </span>
-      </div>
+      ))}
     </div>
   )
 }

@@ -74,7 +74,7 @@ NOT IN THIS MODULE
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -82,6 +82,13 @@ import numpy as np
 
 from src.routing.end_to_end_route import (SPECIAL_CONSIDERATION, RouteResult,
                                           plan_route)
+from src.routing.fuel_cost import MODEL_NAME as FUEL_MODEL_NAME
+from src.routing.fuel_cost import MODEL_VERSION as FUEL_MODEL_VERSION
+from src.routing.fuel_cost import NO_ABSOLUTE_FIGURE_REASON as \
+    NO_ABSOLUTE_FUEL_REASON
+from src.routing.fuel_cost import UNITS
+from src.routing.fuel_cost import (FuelError, FuelParams, load_fuel_params,
+                                   resistance_factor, route_fuel)
 from src.routing.iceberg_navigation_cost import (IcebergTimeNavigationCost,
                                                  load_config)
 from src.routing.navigation_cost import compose_grid, load_composition_config
@@ -91,7 +98,14 @@ from src.routing.time_navigation_cost import (ComposedField,
 PROFILE_FASTEST = "fastest"
 PROFILE_RISK = "risk_oriented"
 PROFILE_SHORTEST = "shortest_distance"
+PROFILE_FUEL = "fuel_efficient"
+#  fuel_efficient is OPTIONAL: it needs a per-bucket sea-ice field the caller
+#  must supply. Without one it is simply absent, and PROFILES names the three
+#  that are always produced, so every existing caller keeps its own shape.
 PROFILES = (PROFILE_FASTEST, PROFILE_RISK, PROFILE_SHORTEST)
+ALL_PROFILES = (PROFILE_FASTEST, PROFILE_RISK, PROFILE_SHORTEST, PROFILE_FUEL)
+
+FUEL_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "fuel_model.json"
 
 OBJECTIVES = {
     PROFILE_FASTEST: {
@@ -123,6 +137,31 @@ OBJECTIVES = {
         "is_a_fuel_or_consumption_figure": False,
         "why_not": "no validated vessel consumption model exists in this project; "
                    "distance is distance",
+    },
+    PROFILE_FUEL: {
+        "label": "estimated fuel",
+        "minimises": "the estimated relative fuel proxy",
+        "units": "open_water_equivalent_metres",
+        "cost_composition": "src.routing.fuel_cost.resistance_factor(sic) per "
+                            "metre, sampled per bucket at the arrival time, over "
+                            "the cells the shared forecast can price",
+        "polaris_penalties_applied": False,
+        "iceberg_exposure_weight_applied": 0.0,
+        "is_a_fuel_or_consumption_figure": True,
+        "is_a_measured_fuel_consumption": False,
+        "is_an_operational_fuel_prediction": False,
+        "what_it_is": "an ESTIMATED relative proxy in open-water-equivalent "
+                      "metres. One unit is the fuel used steaming one metre in "
+                      "ice-free water at the reference speed; that quantity is "
+                      "never resolved into a mass or volume, because this "
+                      "project has no engine, SFOC, displacement, resistance or "
+                      "efficiency data with which to resolve it.",
+        "is_the_same_as_shortest_distance": False,
+        "why_not_distance": "the per-metre factor varies with sea-ice "
+                            "concentration at the arrival time, so two routes "
+                            "of equal length through different ice differ. The "
+                            "degenerate ice_penalty = 0 case, which would make "
+                            "them equal, is refused by the model loader.",
     },
 }
 
@@ -173,6 +212,13 @@ class RouteProfileResult:
     constraint_summary: dict = field(default_factory=dict)
     temporal_provenance: dict = field(default_factory=dict)
     polaris: dict = field(default_factory=dict)
+    #  estimated, relative, and additive: every profile carries it so the
+    #  objectives can be compared on fuel, and every one is re-evaluated from
+    #  the path it actually returned. See src/routing/fuel_cost.py.
+    estimated_fuel: float | None = None
+    estimated_fuel_units: str | None = None
+    estimated_fuel_per_km: float | None = None
+    fuel_provenance: dict = field(default_factory=dict)
 
     @property
     def distance_km(self) -> float | None:
@@ -210,7 +256,8 @@ class ProfileComparison:
 
     @property
     def succeeded(self) -> tuple[str, ...]:
-        return tuple(p for p in PROFILES if self.profiles[p].success)
+        return tuple(p for p in ALL_PROFILES
+                     if p in self.profiles and self.profiles[p].success)
 
     def to_dict(self) -> dict:
         return {"profiles": {k: v.to_dict() for k, v in self.profiles.items()},
@@ -222,7 +269,7 @@ class ProfileComparison:
                 f"{'time h':>9}{'cost':>16}{'iceberg':>12}{'max exp':>9}"
                 f"{'spec':>6}{'indet':>7}")
         lines = [head, "-" * len(head)]
-        for name in PROFILES:
+        for name in (n for n in ALL_PROFILES if n in self.profiles):
             r = self.profiles[name]
             if not r.success:
                 lines.append(f"{name:<18}{OBJECTIVES[name]['label']:<18}"
@@ -260,6 +307,29 @@ class ProfileComparison:
 
 
 # --------------------------------------------------------------- internals
+def _source_key(field, bucket):
+    """What decides a bucket's composed objective field.
+
+    Two buckets priced from the SAME environmental source have the same
+    finite/non-finite pattern and the same sea ice, so their objective
+    compositions are identical arrays. Composing the full grid is the expensive
+    step, so it is done once per SOURCE -- exactly as
+    src/api/environment_provider.forecast_aware_fields already does, and as
+    src/api/world.py caches per environment date.
+
+    A bucket carrying no environmental provenance gets a key of its own, so the
+    behaviour is unchanged wherever a caller records none.
+    """
+    env = getattr(field, "environment", None) or {}
+    path = (env.get("resolution") or {}).get("path")
+    if path:
+        return ("source", path)
+    date = env.get("environment_date") or getattr(field, "environment_date", None)
+    if date is not None and env:
+        return ("date", str(date), env.get("source_type"))
+    return ("bucket", int(bucket))
+
+
 def _uniform_fields(risk_base: TimeIndexedNavigationCost, value: float,
                     usnic_dir, comp_config) -> list[ComposedField]:
     """One ComposedField per risk bucket, carrying a uniform cost per metre.
@@ -270,17 +340,96 @@ def _uniform_fields(risk_base: TimeIndexedNavigationCost, value: float,
     No POLARIS penalty table is supplied: these objectives do not price POLARIS.
     """
     cfg = load_composition_config(comp_config)
-    out = []
+    out, composed = [], {}
     for bucket in risk_base.buckets:
         f = risk_base.fields[bucket]
-        real = np.asarray(f.cost("conservative"), dtype="float64")
-        env = np.where(np.isfinite(real), float(value), np.inf)
+        key = _source_key(f, bucket)
+        if key not in composed:
+            real = np.asarray(f.cost("conservative"), dtype="float64")
+            env = np.where(np.isfinite(real), float(value), np.inf)
+            composed[key] = compose_grid(env, {}, cfg, usnic_dir)
         out.append(ComposedField(
-            bucket=bucket, composition=compose_grid(env, {}, cfg, usnic_dir),
+            bucket=bucket, composition=composed[key],
             environment_date=f.environment_date, chart_date=f.chart_date,
             epsg=f.epsg, shape=f.shape, transform=f.transform,
-            label=f"{f.label or bucket} [objective]"))
+            label=f"{f.label or bucket} [objective]",
+            #  the objective carries the risk provider's OWN environmental
+            #  provenance for this bucket: all three profiles were priced
+            #  against the same field, and each says so
+            environment=dict(f.environment)))
     return out
+
+
+def _fuel_fields(risk_base: TimeIndexedNavigationCost, sic_for_bucket,
+                 params: FuelParams, usnic_dir, comp_config) -> list[ComposedField]:
+    """One ComposedField per risk bucket, carrying the fuel factor per metre.
+
+    Same contract as _uniform_fields: the finite/non-finite pattern is copied
+    from the risk provider's OWN cost, so the feasible set is identical to the
+    other profiles'. A cell the risk provider CAN price but whose sea-ice
+    concentration is missing would shrink that set for this profile alone, so
+    it is refused here rather than quietly dropped or read as ice-free.
+    """
+    cfg = load_composition_config(comp_config)
+    out, composed = [], {}
+    for bucket in risk_base.buckets:
+        f = risk_base.fields[bucket]
+        key = _source_key(f, bucket)
+        if key in composed:
+            out.append(ComposedField(
+                bucket=bucket, composition=composed[key],
+                environment_date=f.environment_date, chart_date=f.chart_date,
+                epsg=f.epsg, shape=f.shape, transform=f.transform,
+                label=f"{f.label or bucket} [objective]",
+                environment=dict(f.environment)))
+            continue
+        real = np.asarray(f.cost("conservative"), dtype="float64")
+        sic = np.asarray(sic_for_bucket(bucket), dtype="float64")
+        if sic.shape != real.shape:
+            raise ProfileError(
+                f"the sea-ice field for bucket {bucket} has shape {sic.shape}, "
+                f"but the risk provider's field is {real.shape}")
+        factor = np.asarray(resistance_factor(sic, params), dtype="float64")
+        priceable = np.isfinite(real)
+        missing = priceable & ~np.isfinite(factor)
+        if missing.any():
+            raise ProfileError(
+                f"{int(missing.sum())} cells in bucket {bucket} are priceable "
+                f"by the risk objective but have no sea-ice concentration, so "
+                f"the fuel objective would search a smaller feasible set than "
+                f"the other profiles. Refusing rather than treating them as "
+                f"ice-free or as blocked.")
+        env = np.where(priceable, factor, np.inf)
+        composed[key] = compose_grid(env, {}, cfg, usnic_dir)
+        out.append(ComposedField(
+            bucket=bucket, composition=composed[key],
+            environment_date=f.environment_date, chart_date=f.chart_date,
+            epsg=f.epsg, shape=f.shape, transform=f.transform,
+            label=f"{f.label or bucket} [objective]",
+            environment=dict(f.environment)))
+    return out
+
+
+def _fuel_provider(risk_provider, sic_for_bucket, params: FuelParams,
+                   usnic_dir, comp_config, iceberg_config_path, *,
+                   allow_mismatch: bool):
+    """The fuel objective, sharing the risk provider's buckets, dates and
+    exposure fields exactly as the other objectives do."""
+    risk_base = (risk_provider.base if isinstance(risk_provider,
+                                                  IcebergTimeNavigationCost)
+                 else risk_provider)
+    base = TimeIndexedNavigationCost.from_fields(
+        _fuel_fields(risk_base, sic_for_bucket, params, usnic_dir, comp_config),
+        bucket_seconds=risk_base.bucket_seconds,
+        start_time=risk_base.start_time,
+        on_unavailable=risk_base.on_unavailable,
+        allow_historical_demo_mismatch=allow_mismatch)
+    if not isinstance(risk_provider, IcebergTimeNavigationCost):
+        return base
+    return IcebergTimeNavigationCost.from_providers(
+        base, risk_provider.exposure,
+        load_config(iceberg_config_path).with_weight(0.0),
+        allow_historical_demo_mismatch=allow_mismatch)
 
 
 def _objective_provider(risk_provider, value: float, usnic_dir, comp_config,
@@ -305,6 +454,21 @@ def _objective_provider(risk_provider, value: float, usnic_dir, comp_config,
         allow_historical_demo_mismatch=allow_mismatch)
 
 
+def _check_fuel_objective(report, route: RouteResult) -> None:
+    """The fuel objective's own search cost IS the fuel, so the independently
+    re-evaluated figure must equal plan_route's total to floating-point noise.
+
+    This is the fuel analogue of _check_reprice: it is what stops the reported
+    fuel drifting away from the quantity the search actually minimised.
+    """
+    got, want = float(report.estimated_fuel), float(route.metrics.total_cost)
+    if not math.isclose(got, want, rel_tol=REPRICE_REL_TOL, abs_tol=0.0):
+        raise ProfileError(
+            f"the fuel objective minimised {want!r} but re-evaluating its own "
+            f"returned path gives {got!r}; the reported fuel is not the fuel "
+            f"of the route that was chosen")
+
+
 def _reprice(risk_provider, route: RouteResult, branch: str,
              pixel_size) -> dict:
     """Price a route the risk objective did not choose, through the risk cost.
@@ -315,8 +479,19 @@ def _reprice(risk_provider, route: RouteResult, branch: str,
     profile, where the two must agree exactly, so it cannot drift silently.
     """
     dx, dy = pixel_size
-    cells = [risk_provider.cell(r, c, t, branch)
-             for (r, c), t in zip(route.path, route.arrival_times)]
+    #  A provider WITHOUT an iceberg layer has no .cell(); its composed cell is
+    #  reached through the field for that arrival time. This is the shape the
+    #  long-horizon evaluation uses, where the iceberg term is omitted on
+    #  purpose. Its exposure is reported as ABSENT (None), never as zero: no
+    #  layer is not the same statement as no icebergs, and the caller records
+    #  the omission and its reason alongside the result.
+    has_iceberg = hasattr(risk_provider, "cell")
+    if has_iceberg:
+        cells = [risk_provider.cell(r, c, t, branch)
+                 for (r, c), t in zip(route.path, route.arrival_times)]
+    else:
+        cells = [risk_provider.field_for(t).composition.cell(r, c, branch)
+                 for (r, c), t in zip(route.path, route.arrival_times)]
 
     def trapezoid(values) -> float:
         total = 0.0
@@ -325,10 +500,23 @@ def _reprice(risk_provider, route: RouteResult, branch: str,
             total += dist * 0.5 * (va + vb)
         return total
 
-    exposures = [c.iceberg_exposure for c in cells if c.iceberg_exposure is not None]
     env = trapezoid([c.environmental_cost for c in cells])
     pol = trapezoid([c.polaris_penalty for c in cells])
     cov = trapezoid([c.coverage_uncertainty_cost for c in cells])
+    if not has_iceberg:
+        return {
+            "configured_cost": env + pol + cov,
+            "environmental_contribution": env, "polaris_contribution": pol,
+            "coverage_uncertainty_contribution": cov,
+            #  no layer was priced, so there is no contribution to report and
+            #  no exposure was measured. Neither is asserted to be zero risk.
+            "iceberg_exposure_contribution": 0.0,
+            "max_iceberg_exposure": None,
+            "contributing_iceberg_ids": (),
+            "any_extrapolated_uncertainty": False,
+            "iceberg_layer_present": False,
+        }
+    exposures = [c.iceberg_exposure for c in cells if c.iceberg_exposure is not None]
     ice = trapezoid([c.iceberg_cost for c in cells])
     return {
         "configured_cost": env + pol + cov + ice,
@@ -340,6 +528,7 @@ def _reprice(risk_provider, route: RouteResult, branch: str,
             {c.iceberg_id for c in cells if c.iceberg_id})),
         "any_extrapolated_uncertainty": any(bool(c.extrapolated_uncertainty)
                                             for c in cells),
+        "iceberg_layer_present": True,
     }
 
 
@@ -432,6 +621,7 @@ def compare_profiles(grid_factory, *, risk_provider, usnic_dir,
                      departure_time: datetime, vessel_speed_mps: float,
                      constraints_factory=None,
                      comp_config=None, iceberg_config=None,
+                     sic_for_bucket=None, fuel_params: FuelParams | None = None,
                      branch: str = "conservative",
                      polaris_ice_class: str | None = None,
                      polaris_riv_table: str | None = None,
@@ -479,6 +669,16 @@ def compare_profiles(grid_factory, *, risk_provider, usnic_dir,
             risk_provider, 1.0, usnic_dir, comp_config, iceberg_config,
             allow_mismatch=mismatch),
     }
+    #  fuel is OPT-IN: without a per-bucket sea-ice field there is nothing to
+    #  build a resistance factor from, and this layer will not substitute one.
+    fuel_params = fuel_params or (None if sic_for_bucket is None
+                                  else load_fuel_params(FUEL_CONFIG))
+    if sic_for_bucket is not None:
+        fuel_params.validate()
+        providers[PROFILE_FUEL] = _fuel_provider(
+            risk_provider, sic_for_bucket, fuel_params, usnic_dir, comp_config,
+            iceberg_config, allow_mismatch=mismatch)
+    names = tuple(n for n in ALL_PROFILES if n in providers)
 
     shared = dict(start=list(start), goal=list(goal),
                   departure_time=departure_time.isoformat(),
@@ -486,7 +686,7 @@ def compare_profiles(grid_factory, *, risk_provider, usnic_dir,
                   allow_historical_demo_override=bool(
                       allow_historical_demo_override))
     results, routes = {}, {}
-    for name in PROFILES:
+    for name in names:
         grid = grid_factory()
         kw = dict(plan_kwargs)
         if constraints_factory is not None:
@@ -509,9 +709,26 @@ def compare_profiles(grid_factory, *, risk_provider, usnic_dir,
                 _check_reprice(priced, route)
         records = polaris_penalties.records if polaris_penalties else None
         results[name] = _result(name, route, priced=priced, records=records)
+        #  PHASE 5: the fuel reported for a route is re-evaluated FROM THAT
+        #  ROUTE's own returned path and arrival times, through the standalone
+        #  evaluator, so it can never be the fuel of a different path.
+        if route.success and sic_for_bucket is not None:
+            report = route_fuel(
+                route.path, route.arrival_times,
+                sic_for_bucket=sic_for_bucket,
+                bucket_of=risk_base.bucket_for, pixel_size=pixel,
+                params=fuel_params)
+            results[name] = replace(
+                results[name],
+                estimated_fuel=report.estimated_fuel,
+                estimated_fuel_units=report.units,
+                estimated_fuel_per_km=report.fuel_per_km,
+                fuel_provenance=report.provenance())
+            if name == PROFILE_FUEL:
+                _check_fuel_objective(report, route)
 
     #  every profile must have been asked the same question
-    for name in PROFILES:
+    for name in names:
         r = results[name]
         for field_name, want in (("start", tuple(start)), ("goal", tuple(goal)),
                                  ("departure_time", departure_time.isoformat())):
@@ -559,6 +776,42 @@ def compare_profiles(grid_factory, *, risk_provider, usnic_dir,
             "one constant."),
         shortest_distance_is_a_fuel_figure=False,
         this_is_not_a_ranking=True,
-        profiles_are_different_objectives_in_different_units=True)
+        profiles_are_different_objectives_in_different_units=True,
+        **_fuel_provenance(results, fuel_params, sic_for_bucket))
     return ProfileComparison(profiles=results, shared_inputs=shared,
                              provenance=provenance)
+
+
+def _fuel_provenance(results: dict, fuel_params, sic_for_bucket) -> dict:
+    """What the comparison may say about fuel, and what it may not."""
+    if sic_for_bucket is None:
+        return {
+            "estimated_fuel_available": False,
+            "why_no_estimated_fuel":
+                "no per-bucket sea-ice field was supplied, and this layer will "
+                "not substitute one. The fuel objective is absent rather than "
+                "estimated from something else.",
+        }
+    fuel, short = results.get(PROFILE_FUEL), results.get(PROFILE_SHORTEST)
+    coincided = (None if not (fuel and short and fuel.success and short.success)
+                 else fuel.path == short.path)
+    return {
+        "estimated_fuel_available": True,
+        "estimated_fuel_is_measured_consumption": False,
+        "estimated_fuel_is_an_operational_prediction": False,
+        "estimated_fuel_units": UNITS,
+        "estimated_fuel_model": f"{FUEL_MODEL_NAME} {FUEL_MODEL_VERSION}",
+        "estimated_fuel_parameters": fuel_params.as_dict(),
+        "estimated_fuel_no_absolute_figure_reason": NO_ABSOLUTE_FUEL_REASON,
+        "fuel_efficient_is_shortest_distance": False,
+        "fuel_efficient_and_shortest_distance_coincided": coincided,
+        "why_they_can_coincide_on_uniform_ice":
+            "the fuel factor is a function of sea-ice concentration, so where "
+            "the concentration is uniform over every candidate path the factor "
+            "is a constant multiplier and the two objectives order paths "
+            "identically. They separate wherever the ice varies. A coincidence "
+            "is a measured fact about the field, not an aliasing of the two "
+            "objectives.",
+        "estimated_fuel_suitable_for_relative_comparison": True,
+        "estimated_fuel_suitable_for_operational_prediction": False,
+    }

@@ -325,6 +325,63 @@ def test_the_forecast_states_the_drift_model_it_actually_ran():
             f"and the physics position")
 
 
+def test_every_bucket_declares_the_environment_it_was_priced_with():
+    """The API must not leave the temporal assumption unstated.
+
+    Every routing bucket reports which environmental field it was built from,
+    the window that field was used for, and whether anything was carried
+    forward. The shipped policy is persistence from the departure analysis;
+    the two demonstration buckets both close inside that day, so nothing is
+    carried forward and the payload says exactly that.
+    """
+    body = demo(True)
+    for name in PROFILES:
+        profile = body["comparison"]["profiles"][name]
+        assert profile["success"], profile["outcome"]
+        tp = profile["temporal_provenance"]
+        assert tp["environment_provenance_recorded"] is True, name
+        assert tp["environment_policies"] == [
+            "persistence_from_departure_analysis"], name
+        by_bucket = tp["environment_by_bucket"]
+        assert sorted(int(b) for b in by_bucket) == tp["buckets"], name
+        for bucket, entry in by_bucket.items():
+            assert entry["bucket"] == int(bucket)
+            assert entry["source"] == f"observation:{DEMO['environment_date']}"
+            assert entry["environment_date"] == DEMO["environment_date"]
+            assert entry["valid_from_s"] == int(bucket) * tp["bucket_seconds"]
+            assert entry["valid_to_s"] == (int(bucket) + 1) * tp["bucket_seconds"]
+            assert entry["fallback"] is None, entry
+            assert entry["persisted"] is False, entry
+            assert entry["uses_future_observation"] is False, entry
+    tp = body["comparison"]["profiles"]["risk_oriented"]["temporal_provenance"]
+    return (f"{tp['environment_policies'][0]}; buckets "
+            f"{[e['valid_from'][11:16] + '-' + e['valid_to'][11:16] for e in tp['environment_by_bucket'].values()]} "
+            f"-> {tp['environment_field_dates']}")
+
+
+def test_the_payload_says_the_environment_did_not_vary_with_arrival_time():
+    """The honest headline, and the one the iceberg layer contradicts.
+
+    The environmental term -- sea ice, currents, the POLARIS penalty and the
+    coverage-uncertainty term -- is one field for the whole route. The iceberg
+    exposure term is NOT: it is a different raster per bucket, and the same
+    payload reports both facts side by side rather than implying the route is
+    forecast-driven throughout.
+    """
+    tp = demo(True)["comparison"]["profiles"]["risk_oriented"][
+        "temporal_provenance"]
+    assert tp["environment_is_time_varying"] is False
+    assert len(tp["environment_field_dates"]) == 1
+    assert tp["environment_persisted_buckets"] == []
+    assert tp["environment_uses_future_observations"] is False
+    #  the iceberg term genuinely does move with the arrival time
+    horizons = tp["iceberg_exposure_horizons_hours"]
+    assert len(set(horizons.values() if isinstance(horizons, dict)
+                   else horizons)) > 1, horizons
+    return (f"environment: one field for every bucket; iceberg exposure: "
+            f"{horizons}")
+
+
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
 
 

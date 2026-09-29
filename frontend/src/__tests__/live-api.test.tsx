@@ -3,7 +3,17 @@ import userEvent from '@testing-library/user-event'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 import App from '../App'
-import type { ForecastResponse, MissionResponse } from '../api/types'
+import { formatDate } from '../api/provenance'
+import { injectionPoint } from '../map/injection'
+import {
+  groupEquivalentRoutes,
+  pathsEqual,
+} from '../api/routeEquivalence'
+import type {
+  ForecastResponse,
+  MissionResponse,
+  SimulationResponse,
+} from '../api/types'
 
 // An end-to-end check against a RUNNING backend: it renders the real screen
 // from the real API responses, so nothing between compare_profiles() /
@@ -64,11 +74,13 @@ function serve(real: MissionResponse, bergs: ForecastResponse | null) {
     const url = String(input)
     const body = url.includes('/health')
       ? { status: 'ok', prototype: true, grid: real.grid }
-      : url.includes('/forecast/')
-        ? bergs
-        : url.includes('/layers/')
-          ? { type: 'FeatureCollection', features: [] }
-          : real
+      : url.includes('/mission/defaults')
+        ? { demo: backendDefaults, grid: real.grid }
+        : url.includes('/forecast/')
+          ? bergs
+          : url.includes('/layers/')
+            ? { type: 'FeatureCollection', features: [] }
+            : real
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -77,6 +89,38 @@ function serve(real: MissionResponse, bergs: ForecastResponse | null) {
 }
 
 describe('live backend', () => {
+  it('groups the objectives the real backend returned the same path for', async ({
+    skip,
+  }) => {
+    if (!live || !payload) {
+      skip()
+      return
+    }
+    const profiles = payload.comparison.profiles
+    const groups = groupEquivalentRoutes(profiles)
+    const together = (a: keyof typeof profiles, b: keyof typeof profiles) =>
+      groups.some(
+        (group) => group.profiles.includes(a) && group.profiles.includes(b),
+      )
+
+    //  the grouping is exactly what the returned cell sequences say, and it
+    //  agrees with the backend's OWN measurement of the same thing. Neither
+    //  side is asserted to be true today: they are asserted to agree.
+    expect(together('fastest', 'shortest_distance')).toBe(
+      pathsEqual(profiles.fastest.path, profiles.shortest_distance.path),
+    )
+    expect(together('fastest', 'shortest_distance')).toBe(
+      payload.comparison.provenance.fastest_and_shortest_distance_coincided,
+    )
+    expect(together('fastest', 'risk_oriented')).toBe(
+      pathsEqual(profiles.fastest.path, profiles.risk_oriented.path),
+    )
+    //  every objective appears exactly once, whatever the geometry did
+    expect(groups.flatMap((group) => group.profiles).sort()).toEqual(
+      ['fastest', 'risk_oriented', 'shortest_distance'],
+    )
+  })
+
   it('renders the real comparison on the real screen', async ({ skip }) => {
     if (!live || !payload) {
       skip()
@@ -90,10 +134,24 @@ describe('live backend', () => {
     const start = await screen.findByTestId('start-forecast')
     await waitFor(() => expect(start).toBeEnabled())
     await user.click(start)
-    await user.click(await screen.findByTestId('use-forecast'))
+
+    //  the real demonstration pairs a 2020 chart with a later environment, so
+    //  the dock gates routing until the operator enables it
+    const dock = await screen.findByTestId('use-forecast')
+    if (dock.getAttribute('data-action') === 'enable_override') {
+      await user.click(dock)
+      await waitFor(() =>
+        expect(screen.getByTestId('use-forecast')).toHaveAttribute(
+          'data-action',
+          'route',
+        ),
+      )
+    }
+    await user.click(screen.getByTestId('use-forecast'))
 
     for (const name of ['fastest', 'risk_oriented', 'shortest_distance'] as const) {
-      const card = await screen.findByTestId(`route-card-${name}`)
+      const chip = await screen.findByTestId(`route-card-${name}`)
+      const card = chip.closest('.option') as HTMLElement
       const profile = real.comparison.profiles[name]
       // the exact number the backend computed, rendered on the card
       expect(card).toHaveTextContent(
@@ -103,8 +161,12 @@ describe('live backend', () => {
         })} km`,
       )
     }
-    expect(await screen.findByTestId('historical-banner')).toHaveTextContent(
-      real.comparison.provenance.chart_dates![0],
+    //  the provenance chip carries the backend's own chart date, formatted
+    expect(await screen.findByTestId('provenance-chart')).toHaveTextContent(
+      formatDate(real.comparison.provenance.chart_dates![0])!,
+    )
+    expect(screen.getByTestId('provenance-environment')).toHaveTextContent(
+      formatDate(real.comparison.provenance.environment_dates![0])!,
     )
   })
 
@@ -123,7 +185,12 @@ describe('live backend', () => {
     await user.click(start)
     await screen.findByTestId('forecast-timeline')
 
-    const subject = bergs.icebergs[0]
+    //  whichever iceberg the app opened on -- read from the panel's own
+    //  selector, so this checks the numbers rather than the choice
+    const selected = (screen.getByLabelText(/^iceberg$/i) as HTMLSelectElement)
+      .value
+    const subject = bergs.icebergs.find((berg) => berg.iceberg_id === selected)!
+    expect(subject).toBeDefined()
     const panel = () =>
       (screen.getByTestId('forecast-panel').textContent ?? '').replace(/\s+/g, ' ')
 
@@ -154,13 +221,15 @@ describe('live backend', () => {
       skip()
       return
     }
-    vi.spyOn(globalThis, 'fetch').mockImplementation(
-      async () =>
-        new Response(JSON.stringify({ status: 'ok', prototype: true }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-    )
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const body = String(input).includes('/mission/defaults')
+        ? { demo: backendDefaults }
+        : { status: 'ok', prototype: true }
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
     const user = userEvent.setup()
     render(<App />)
     const drawer = await screen.findByTestId('mission-drawer')
@@ -179,4 +248,52 @@ describe('live backend', () => {
       backendDefaults.vessel_speed_mps as number,
     )
   })
+})
+
+describe('deterministic injection, against the running backend', () => {
+  it('lands exactly on the route: distance_to_route_m is zero', async ({
+    skip,
+  }) => {
+    if (!live || !payload) {
+      skip()
+      return
+    }
+    //  earlier tests in this file stub fetch with recorded payloads; this one
+    //  talks to the real API, so the stub goes first
+    vi.restoreAllMocks()
+    const real = payload
+    const profile = 'fastest' as const
+    const route = real.comparison.profiles[profile]
+
+    //  the SAME helper the dock uses, on the real route the backend returned
+    const point = injectionPoint(route.path, real.grid)
+    expect(point).not.toBeNull()
+    expect(route.path.map((cell) => cell.join(','))).toContain(
+      point!.cell.join(','),
+    )
+    expect(point!.fraction).toBeGreaterThan(0.3)
+    expect(point!.fraction).toBeLessThan(0.5)
+
+    //  and the real simulation endpoint, with the body the app's client sends
+    //  (the client itself uses a relative URL, which jsdom cannot resolve)
+    const sent = await fetch(`${API}/api/mission/simulate?profile=${profile}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        request: real.request,
+        iceberg: { x: point!.position[0], y: point!.position[1] },
+      }),
+    })
+    expect(sent.ok).toBe(true)
+    const response = (await sent.json()) as SimulationResponse
+    expect(response.simulation).not.toBeNull()
+    expect(response.simulation!.distance_to_route_m).toBe(0)
+    expect(response.simulation!.encounter_cell).toEqual(point!.cell)
+
+    //  whatever the planner decides is what is reported: nothing is forced
+    const change = response.change.profiles[profile]
+    expect(typeof change.path_changed).toBe('boolean')
+    expect(change.cells_with_simulated_exposure).toBeGreaterThan(0)
+    expect(response.change.claims.guarantees_avoidance).toBe(false)
+  }, 600_000)
 })

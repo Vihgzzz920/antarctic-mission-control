@@ -1,29 +1,33 @@
-import type { GridInfo } from '../api/types'
-import { AlertIcon } from './icons'
+import type { Provenance } from '../api/provenance'
+import ProvenanceChip from './ProvenanceChip'
 
-export type Stage = 'observe' | 'forecast' | 'plan'
+export type Stage = 'observe' | 'forecast' | 'plan' | 'respond'
 
 const STEPS: Array<{ id: Stage; label: string }> = [
   { id: 'observe', label: 'Observe' },
   { id: 'forecast', label: 'Forecast' },
   { id: 'plan', label: 'Plan' },
+  { id: 'respond', label: 'Respond' },
 ]
 
 interface Props {
   stage: Stage
   reached: Stage[]
-  grid: GridInfo | null
   online: boolean
-  historical: boolean
+  /** where the data on screen came from; shown from the first paint */
+  provenance: Provenance
+  provenanceOpen: boolean
+  onProvenanceToggle: (open: boolean) => void
   onGo: (stage: Stage) => void
 }
 
 export default function TopBar({
   stage,
   reached,
-  grid,
   online,
-  historical,
+  provenance,
+  provenanceOpen,
+  onProvenanceToggle,
   onGo,
 }: Props) {
   return (
@@ -61,14 +65,11 @@ export default function TopBar({
       </nav>
 
       <div className="topbar-meta">
-        {historical && (
-          <span className="hist-chip" data-testid="historical-banner">
-            <AlertIcon size={12} />
-            <strong>Historical demonstration</strong>
-            <span>Environment {grid?.environment_date ?? '—'}</span>
-            <span>USNIC chart {grid?.usnic_chart_date ?? '—'}</span>
-          </span>
-        )}
+        <ProvenanceChip
+          provenance={provenance}
+          open={provenanceOpen}
+          onToggle={onProvenanceToggle}
+        />
         <span className={`live-chip${online ? '' : ' is-down'}`}>
           <span className="live-dot" aria-hidden="true" />
           {online ? 'Decision support prototype' : 'API unavailable'}
