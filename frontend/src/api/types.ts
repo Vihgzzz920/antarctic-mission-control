@@ -597,3 +597,14 @@ export interface HistoricalEvaluationResponse {
     cases: BacktestCase[]
   }
 }
+
+/** GET /api/mission/defaults -- the backend's own inputs, sites and policies. */
+export interface MissionDefaults {
+  demo: Record<string, unknown>
+  grid: GridInfo
+  /** candidate destinations the BACKEND defines; the UI invents none */
+  sites?: Array<Required<CandidateSite>>
+  long_horizon_site?: Required<CandidateSite>
+  long_horizon_start?: [number, number]
+  policies?: { default: string; supported: string[] }
+}

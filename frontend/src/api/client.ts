@@ -4,6 +4,7 @@
 import type {
   ForecastResponse,
   HealthResponse,
+  MissionDefaults,
   MissionEvaluateRequest,
   MissionEvaluateResponse,
   HistoricalEvaluationResponse,
@@ -64,11 +65,8 @@ export function getHealth(): Promise<HealthResponse> {
   return request_<HealthResponse>('/health')
 }
 
-export function getDefaults(): Promise<{
-  demo: Record<string, unknown>
-  grid: MissionResponse['grid']
-}> {
-  return request_('/mission/defaults')
+export function getDefaults(): Promise<MissionDefaults> {
+  return request_<MissionDefaults>('/mission/defaults')
 }
 
 export function compareMission(

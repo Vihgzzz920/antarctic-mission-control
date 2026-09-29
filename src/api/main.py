@@ -31,7 +31,9 @@ from src.routing.route_profiles import PROFILES, ProfileError, compare_profiles
 from src.api import forecast, geo, simulate
 from src.api.config import (BEDMACHINE, DEMO, ROOT, USNIC,
                             demo_departure)
-from src.api.mission_decision import (NO_FEASIBLE_OPTION, SUPPORTED_POLICIES,
+from src.api.mission_decision import (DEFAULT_POLICY, DEMONSTRATION_SITES,
+                                      LONG_HORIZON_SITE, LONG_HORIZON_START,
+                                      NO_FEASIBLE_OPTION, SUPPORTED_POLICIES,
                                       MissionError, Site, evaluate_mission)
 from src.api.world import (WorldError, fresh_grid, get_world, grid_info,
                            sic_for_bucket)
@@ -195,8 +197,24 @@ def health() -> dict:
 
 @app.get("/api/mission/defaults")
 def defaults() -> dict:
-    """The validated demonstration's inputs, for pre-filling the form."""
-    return {"demo": DEMO, "grid": grid_info()}
+    """The validated demonstration's inputs, for pre-filling the form.
+
+    `sites` and `policies` are published so the frontend never has to invent a
+    destination coordinate or a policy name. Every site here declares whether
+    it is a real operational location -- none is -- and says where its
+    coordinate came from.
+    """
+    return {
+        "demo": DEMO,
+        "grid": grid_info(),
+        "sites": [s.to_dict() for s in DEMONSTRATION_SITES],
+        "long_horizon_site": LONG_HORIZON_SITE.to_dict(),
+        "long_horizon_start": list(LONG_HORIZON_START),
+        "policies": {
+            "default": DEFAULT_POLICY,
+            "supported": list(SUPPORTED_POLICIES),
+        },
+    }
 
 
 @app.get("/api/demo/routes")

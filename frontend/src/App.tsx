@@ -5,6 +5,7 @@ import {
   compareMission,
   getDefaults,
   getHealth,
+  evaluateMission,
   getHistoricalEvaluation,
   getIcebergExposure,
   getIcebergForecast,
@@ -15,6 +16,8 @@ import type {
   GeoJsonCollection,
   HealthResponse,
   HistoricalEvaluationResponse,
+  MissionDefaults,
+  MissionMatrix,
   MissionRequest,
   MissionResponse,
   ProfileName,
@@ -28,6 +31,7 @@ import ForecastPanel from './components/ForecastPanel'
 import ForecastTimeline from './components/ForecastTimeline'
 import MapLegend from './components/MapLegend'
 import MissionDrawer from './components/MissionDrawer'
+import MissionOptionsDrawer from './components/MissionOptionsDrawer'
 import PlanDock from './components/PlanDock'
 import RoutingGate from './components/RoutingGate'
 import SelectedRouteBar from './components/SelectedRouteBar'
@@ -115,6 +119,15 @@ export default function App() {
   const [evidence, setEvidence] =
     useState<HistoricalEvaluationResponse | null>(null)
   const [evidenceError, setEvidenceError] = useState<string | null>(null)
+  //  the backend's own sites and policies, so no coordinate is invented here
+  const [defaults, setDefaults] = useState<MissionDefaults | null>(null)
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const [matrix, setMatrix] = useState<MissionMatrix | null>(null)
+  const [forecastMatrix, setForecastMatrix] = useState<MissionMatrix | null>(
+    null,
+  )
+  const [optionsBusy, setOptionsBusy] = useState(false)
+  const [optionsError, setOptionsError] = useState<string | null>(null)
   const [changeOpen, setChangeOpen] = useState(false)
   //  plan() is declared before the provenance it must respect, so it reads the
   //  current readiness through this mirror rather than a stale closure
@@ -146,8 +159,10 @@ export default function App() {
       .catch((cause: ApiError) => live && setHealthError(cause))
     //  the demonstration's own inputs, so no date is written into this app
     getDefaults()
-      .then(({ demo }) => {
+      .then((response) => {
+        const { demo } = response
         if (!live || !demo) return
+        setDefaults(response)
         setRequest((current) => ({
           ...current,
           start: Array.isArray(demo.start)
@@ -211,6 +226,64 @@ export default function App() {
       live = false
     }
   }, [evidenceOpen, evidence, evidenceError])
+
+  /**
+   * Evaluate the candidate destinations at the candidate departure times.
+   *
+   * Under the forecast-driven option this runs TWICE -- once on persistence and
+   * once on the forecast policy -- because a comparison needs both, and the
+   * backend evaluates each policy as its own independent run.
+   */
+  const evaluateOptions = useCallback(
+    async ({
+      sites,
+      departures,
+      scientific,
+    }: {
+      sites: Array<Required<import('./api/types').CandidateSite>>
+      departures: string[]
+      scientific: boolean
+    }) => {
+      setOptionsBusy(true)
+      setOptionsError(null)
+      setForecastMatrix(null)
+      const start = request.start
+      const profiles: ProfileName[] = [
+        'fastest',
+        'fuel_efficient',
+        'risk_oriented',
+      ]
+      const body = {
+        start,
+        sites,
+        departure_times: departures,
+        profiles,
+        vessel_speed_mps: request.vessel_speed_mps,
+        polaris_ice_class: request.polaris_ice_class,
+        polaris_riv_table: request.polaris_riv_table,
+      }
+      try {
+        const base = await evaluateMission(
+          scientific ? { ...body, horizon_buckets: 16 } : body,
+        )
+        setMatrix(base.mission)
+        if (scientific) {
+          const driven = await evaluateMission({
+            ...body,
+            environment_policy: 'long_horizon_forecast_evaluation',
+            horizon_buckets: 16,
+          })
+          setForecastMatrix(driven.mission)
+        }
+      } catch (cause) {
+        const api = cause as ApiError
+        setOptionsError(api?.message ?? 'The mission evaluation failed.')
+      } finally {
+        setOptionsBusy(false)
+      }
+    },
+    [request],
+  )
 
   const go = useCallback((next: Stage) => {
     setStage(next)
@@ -854,6 +927,8 @@ export default function App() {
                   vesselSpeedMps={shown.request?.vessel_speed_mps ?? null}
                   canRespond={canRespond}
                   onRespond={respond}
+                  optionsOpen={optionsOpen}
+                  onOptions={() => setOptionsOpen((current) => !current)}
                 />
               </>
             ) : (
@@ -929,6 +1004,20 @@ export default function App() {
           </header>
           <ValidationPanel data={evidence} error={evidenceError} />
         </aside>
+      )}
+
+      {stage === 'plan' && (
+        <MissionOptionsDrawer
+          open={optionsOpen}
+          onClose={() => setOptionsOpen(false)}
+          defaults={defaults}
+          matrix={matrix}
+          forecastMatrix={forecastMatrix}
+          busy={optionsBusy}
+          error={optionsError}
+          departureTime={request.departure_time}
+          onEvaluate={evaluateOptions}
+        />
       )}
 
       {stage === 'plan' && shown && selected && (

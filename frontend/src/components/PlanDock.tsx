@@ -78,6 +78,9 @@ interface Props {
   /** RESPOND is reachable only once a route exists */
   canRespond: boolean
   onRespond: () => void
+  /** several destinations at several departure times; closed by default */
+  optionsOpen?: boolean
+  onOptions?: () => void
 }
 
 /**
@@ -96,6 +99,8 @@ export default function PlanDock({
   vesselSpeedMps,
   canRespond,
   onRespond,
+  optionsOpen = false,
+  onOptions,
 }: Props) {
   return (
     <div className="plan-dock" data-testid="plan-dock">
@@ -104,6 +109,17 @@ export default function PlanDock({
           <p className="dock-provenance" data-testid="priced-horizon">
             {provenance}
           </p>
+        )}
+        {onOptions && (
+          <button
+            type="button"
+            className={`dock-secondary${optionsOpen ? ' is-open' : ''}`}
+            onClick={onOptions}
+            aria-expanded={optionsOpen}
+            data-testid="open-mission-options"
+          >
+            Mission options
+          </button>
         )}
         {canRespond && (
           <button
