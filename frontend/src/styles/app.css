@@ -1428,3 +1428,48 @@ body.low-bandwidth .mx-option, body.low-bandwidth .prov-list > li {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ── Why drawer: the sections added for fuel and forecast provenance ── */
+.why-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule-soft); }
+.why-section h3 {
+  margin: 0 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.why-leads { font-family: var(--mono); letter-spacing: 0; color: var(--accent); }
+
+/* ── the evidence drawer: same shell as Why, a little wider for tables ── */
+.evidence-drawer {
+  position: absolute;
+  top: var(--top-h); right: 0; bottom: 0;
+  z-index: 10;
+  width: 486px;
+  display: flex; flex-direction: column;
+  border-left: 1px solid var(--rule);
+  background: rgba(8, 13, 19, 0.97);
+  backdrop-filter: blur(8px);
+  animation: slide-in 160ms ease-out;
+}
+.evidence-drawer > header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--rule);
+  flex: 0 0 auto;
+}
+.evidence-drawer > header h2 {
+  margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-2);
+}
+.evidence-drawer > header button {
+  background: none; border: none; color: var(--ink-3);
+  font-size: 19px; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.evidence-drawer > header button:hover { color: var(--ink); }
+.evidence-drawer > .validation { overflow-y: auto; }
+
+.evidence-chip {
+  background: none; border: 1px solid var(--rule); border-radius: 3px;
+  color: var(--ink-2); font: inherit; font-size: 11px; padding: 3px 10px;
+  cursor: pointer;
+}
+.evidence-chip:hover, .evidence-chip.is-open {
+  border-color: var(--accent); color: var(--ink);
+}

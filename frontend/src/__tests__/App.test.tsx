@@ -24,6 +24,7 @@ import {
   missionResponse,
   simulationResponse,
 } from './fixtures'
+import { historicalEvaluation } from './missionEvidence.fixtures'
 
 // The map is an OpenLayers canvas; jsdom has no WebGL or layout. The mock
 // records the props the map is actually handed, so the tests can see what the
@@ -99,6 +100,7 @@ const client = vi.hoisted(() => ({
   getIcebergExposure: vi.fn(),
   getIcebergForecast: vi.fn(),
   simulateIceberg: vi.fn(),
+  getHistoricalEvaluation: vi.fn(),
 }))
 
 vi.mock('../api/client', async () => {
@@ -192,6 +194,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   client.getHealth.mockResolvedValue(HEALTH)
   client.getDefaults.mockResolvedValue(missionDefaults())
+  client.getHistoricalEvaluation.mockResolvedValue(historicalEvaluation())
   client.getIcebergExposure.mockResolvedValue({
     type: 'FeatureCollection',
     features: [
@@ -2150,6 +2153,180 @@ describe('respond evidence', () => {
     expect(screen.queryByTestId('respond-figures')).not.toBeInTheDocument()
     expect(screen.getByTestId('respond-headline')).toHaveTextContent(
       /no simulated event yet/i,
+    )
+  })
+})
+
+// ── the surfaces mounted for the final integration ──────────────────────
+
+describe('which kind of answer the route is', () => {
+  it('names the operational demo from the policy the backend reported', async () => {
+    client.compareMission.mockResolvedValue(missionResponse(true))
+    await toPlan()
+    const bar = await screen.findByTestId('selected-route-bar')
+    const badge = within(bar).getByTestId('evaluation-badge')
+    //  the demo is persistence-priced, so it is the operational demonstration
+    expect(badge).toHaveAttribute('data-mode', 'operational_demo')
+    expect(flat(badge)).toContain('Operational demo')
+    expect(
+      within(bar).queryByTestId('evaluation-badge-note'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('calls it a scientific evaluation when the backend named that policy', async () => {
+    const payload = missionResponse(true)
+    for (const name of PROFILE_ORDER) {
+      const route = payload.comparison.profiles[name]
+      if (!route) continue
+      route.temporal_provenance = {
+        ...route.temporal_provenance,
+        environment_policies: ['long_horizon_forecast_evaluation'],
+      }
+    }
+    client.compareMission.mockResolvedValue(payload)
+    await toPlan()
+    const badge = within(
+      await screen.findByTestId('selected-route-bar'),
+    ).getByTestId('evaluation-badge')
+    expect(badge).toHaveAttribute(
+      'data-mode',
+      'long_horizon_scientific_evaluation',
+    )
+    //  the distinction is in words, not colour alone
+    expect(flat(badge)).toContain('not an operational assessment')
+  })
+
+  it('shows the estimated fuel the backend sent, in OWE-m', async () => {
+    client.compareMission.mockResolvedValue(missionResponse(true))
+    await toPlan()
+    const fuel = await screen.findByTestId('selected-route-fuel')
+    expect(flat(fuel)).toContain('OWE-m')
+    expect(flat(fuel)).toContain('estimated fuel')
+    const bar = flat(screen.getByTestId('selected-route-bar')).toLowerCase()
+    for (const banned of ['litre', 'tonne', 'gallon']) {
+      expect(bar).not.toContain(banned)
+    }
+  })
+})
+
+describe('forecast provenance in the route drawer', () => {
+  it('says plainly when no bucket was priced from a forecast', async () => {
+    client.compareMission.mockResolvedValue(missionResponse(true))
+    const user = await toPlan()
+    await user.click(await screen.findByTestId('why-toggle'))
+    const section = await screen.findByTestId('why-forecast-provenance')
+    //  the recorded demo is persistence-priced throughout
+    expect(flat(section)).toContain(
+      'No bucket on this route was priced from a model forecast',
+    )
+  })
+
+  it('renders the lineage of every forecast-priced bucket', async () => {
+    const payload = missionResponse(true)
+    const route = payload.comparison.profiles.risk_oriented
+    route.temporal_provenance = {
+      ...route.temporal_provenance,
+      environment_by_bucket: {
+        '0': { bucket: 0, source_type: 'explicit_persistence', model: null },
+        '4': {
+          bucket: 4,
+          source_type: 'model_forecast',
+          model: 'HistGradientBoostingRegressor',
+          resolution: {
+            path: 'sic_forecast_hgb_origin20250108_plus24h_valid20250109_3976.tif',
+            lead_hours: 24,
+            validity_rule: 'target_composite_day',
+            validity_from: '2025-01-09T00:00:00',
+            validity_to: '2025-01-10T00:00:00',
+            forecast_origin: '2025-01-08T00:00:00',
+            valid_time: '2025-01-09T00:00:00',
+          },
+          model_artifact: 'data/processed/forecast_model_hgb.joblib',
+          model_artifact_sha256: '463917f386b92e6e996506504c3662dfb0b5f828',
+          dataset: 'data/processed/forecast_dataset.npz',
+          dataset_sha256: '1721e165a765b31fc2866f0f7837ce9d80d2a653',
+        },
+      },
+    }
+    client.compareMission.mockResolvedValue(payload)
+    const user = await toPlan()
+    await user.click(await screen.findByTestId('route-card-risk_oriented'))
+    await user.click(await screen.findByTestId('why-toggle'))
+
+    const bucket = await screen.findByTestId('forecast-bucket-4')
+    expect(flat(bucket)).toContain('+24h')
+    expect(flat(bucket)).toContain('HistGradientBoostingRegressor')
+    expect(flat(bucket)).toContain('target_composite_day')
+    expect(flat(bucket)).toContain('forecast_model_hgb.joblib')
+    expect(flat(bucket)).toContain('463917f386b9')
+    //  the persistence bucket is not dressed up as a forecast
+    expect(screen.queryByTestId('forecast-bucket-0')).not.toBeInTheDocument()
+    //  and the heading names the lead the backend reported
+    expect(flat(screen.getByTestId('why-forecast-provenance'))).toContain('+24h')
+  })
+
+  it('states what the estimated fuel figure is not', async () => {
+    client.compareMission.mockResolvedValue(missionResponse(true))
+    const user = await toPlan()
+    await user.click(await screen.findByTestId('why-toggle'))
+    const block = await screen.findByTestId('why-fuel-assumptions')
+    const text = flat(block)
+    //  <dt>/<dd> pairs concatenate without a space in textContent
+    expect(text).toContain('Estimated relative proxy')
+    expect(text).toMatch(/Measured consumption\s*no/i)
+    expect(text).toMatch(/Operational prediction\s*no/i)
+    expect(text).toMatch(/Absolute volume or mass\s*unavailable/i)
+  })
+})
+
+describe('the validation evidence view', () => {
+  it('is closed until asked for, and is not part of the mission flow', async () => {
+    client.compareMission.mockResolvedValue(missionResponse(true))
+    render(<App />)
+    await screen.findByTestId('start-forecast')
+    expect(screen.queryByTestId('evidence-panel')).not.toBeInTheDocument()
+    //  it was not fetched either
+    expect(client.getHistoricalEvaluation).not.toHaveBeenCalled()
+  })
+
+  it('opens from the top bar and reports the held-out result faithfully', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByTestId('evidence-toggle'))
+
+    const panel = await screen.findByTestId('evidence-panel')
+    expect(client.getHistoricalEvaluation).toHaveBeenCalledTimes(1)
+    const counts = flat(await screen.findByTestId('validation-counts'))
+    expect(counts).toContain('cases evaluated')
+    expect(counts).toContain('routes changed')
+
+    //  the numbers that do not favour the forecast are shown, not softened
+    const outcome = flat(screen.getByTestId('validation-outcome'))
+    expect(outcome).toContain('1')
+    expect(outcome).toContain('4')
+    expect(flat(screen.getByTestId('validation-limitation'))).toContain(
+      'does not establish universal superiority',
+    )
+    const text = flat(panel).toLowerCase()
+    for (const banned of [
+      'proof the model works',
+      'accuracy guaranteed',
+      'beats persistence',
+      'improves safety',
+    ]) {
+      expect(text).not.toContain(banned)
+    }
+  })
+
+  it('reports an unavailable artifact instead of an empty panel', async () => {
+    client.getHistoricalEvaluation.mockRejectedValue(
+      new ApiError('the historical backtest artifact has not been produced', 404),
+    )
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByTestId('evidence-toggle'))
+    expect(flat(await screen.findByTestId('validation-error'))).toContain(
+      'has not been produced',
     )
   })
 })

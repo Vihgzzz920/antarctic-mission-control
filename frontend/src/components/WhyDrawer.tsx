@@ -1,7 +1,9 @@
 import { PROFILE_LABEL } from '../api/types'
 import type { Comparison, ProfileName } from '../api/types'
+import { environmentBuckets, forecastLeads } from '../api/routeEnvironment'
+import ForecastProvenanceList from './ForecastProvenanceList'
 import { buildFindings, identicalTo } from './findings'
-import { count, exposure, num } from './format'
+import { count, exposure, num, owe, owePerKm } from './format'
 
 interface Props {
   comparison: Comparison
@@ -27,6 +29,9 @@ export default function WhyDrawer({
 
   const findings = buildFindings(comparison, profile)
   const twins = identicalTo(comparison, profile)
+  const buckets = environmentBuckets(route)
+  const leads = forecastLeads(route)
+  const fuel = route.fuel_provenance ?? null
 
   return (
     <aside className="why-drawer" data-testid="why-panel">
@@ -96,6 +101,56 @@ export default function WhyDrawer({
             strictly increasing function of path length.
           </p>
         )}
+
+        {/*  What the estimated fuel figure means, where there is one.  */}
+        {route.estimated_fuel !== null &&
+          route.estimated_fuel !== undefined && (
+            <section className="why-section" data-testid="why-fuel">
+              <h3>Estimated fuel</h3>
+              <p className="why-note">
+                <b>{owe(route.estimated_fuel)}</b>
+                {route.estimated_fuel_per_km !== null &&
+                  route.estimated_fuel_per_km !== undefined &&
+                  ` · ${owePerKm(route.estimated_fuel_per_km)}`}
+              </p>
+              {fuel && (
+                <dl className="why-grid" data-testid="why-fuel-assumptions">
+                  <div>
+                    <dt>Fuel model</dt>
+                    <dd>Estimated relative proxy</dd>
+                  </div>
+                  <div>
+                    <dt>Measured consumption</dt>
+                    <dd>{fuel.is_a_measured_fuel_consumption ? 'yes' : 'no'}</dd>
+                  </div>
+                  <div>
+                    <dt>Operational prediction</dt>
+                    <dd>
+                      {fuel.is_an_operational_fuel_prediction ? 'yes' : 'no'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Absolute volume or mass</dt>
+                    <dd>unavailable</dd>
+                  </div>
+                </dl>
+              )}
+            </section>
+          )}
+
+        {/*  "What forecast actually affected this route?"  */}
+        <section className="why-section" data-testid="why-forecast-provenance">
+          <h3>
+            Forecast provenance
+            {leads.length > 0 && (
+              <span className="why-leads">
+                {' '}
+                {leads.map((l) => `+${l}h`).join(', ')}
+              </span>
+            )}
+          </h3>
+          <ForecastProvenanceList buckets={buckets} />
+        </section>
       </div>
     </aside>
   )

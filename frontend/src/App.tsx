@@ -5,6 +5,7 @@ import {
   compareMission,
   getDefaults,
   getHealth,
+  getHistoricalEvaluation,
   getIcebergExposure,
   getIcebergForecast,
   simulateIceberg,
@@ -13,6 +14,7 @@ import type {
   ForecastResponse,
   GeoJsonCollection,
   HealthResponse,
+  HistoricalEvaluationResponse,
   MissionRequest,
   MissionResponse,
   ProfileName,
@@ -34,6 +36,7 @@ import RespondDrawer from './components/RespondDrawer'
 import TopBar from './components/TopBar'
 import type { Stage } from './components/TopBar'
 import TransitControl from './components/TransitControl'
+import ValidationPanel from './components/ValidationPanel'
 import WhyDrawer from './components/WhyDrawer'
 import { resolveCameraPlan } from './map/camera'
 import type { CameraStage, XY } from './map/camera'
@@ -106,6 +109,12 @@ export default function App() {
 
   const [whyOpen, setWhyOpen] = useState(false)
   const [provenanceOpen, setProvenanceOpen] = useState(false)
+  //  the held-out historical evaluation. Fetched only when the operator opens
+  //  it, so the main flow never waits on evidence it did not ask for.
+  const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const [evidence, setEvidence] =
+    useState<HistoricalEvaluationResponse | null>(null)
+  const [evidenceError, setEvidenceError] = useState<string | null>(null)
   const [changeOpen, setChangeOpen] = useState(false)
   //  plan() is declared before the provenance it must respect, so it reads the
   //  current readiness through this mirror rather than a stale closure
@@ -183,6 +192,25 @@ export default function App() {
       live = false
     }
   }, [])
+
+  //  fetched on first open only, and never re-fetched: the artifact is a file
+  //  the backend produced, not a live figure
+  useEffect(() => {
+    if (!evidenceOpen || evidence || evidenceError) return
+    let live = true
+    getHistoricalEvaluation()
+      .then((response) => live && setEvidence(response))
+      .catch((cause: ApiError) =>
+        live &&
+        setEvidenceError(
+          cause.message ||
+            'The historical evaluation artifact is not available.',
+        ),
+      )
+    return () => {
+      live = false
+    }
+  }, [evidenceOpen, evidence, evidenceError])
 
   const go = useCallback((next: Stage) => {
     setStage(next)
@@ -686,6 +714,8 @@ export default function App() {
         provenanceOpen={provenanceOpen}
         onProvenanceToggle={setProvenanceOpen}
         onGo={setStage}
+        evidenceOpen={evidenceOpen}
+        onEvidenceToggle={setEvidenceOpen}
       />
 
       {stage !== 'respond' && (
@@ -881,6 +911,24 @@ export default function App() {
           open={changeOpen}
           onClose={() => setChangeOpen(false)}
         />
+      )}
+
+      {/*  Evidence, not part of the mission flow: available from any stage
+           and closed by default.  */}
+      {evidenceOpen && (
+        <aside className="evidence-drawer" data-testid="evidence-panel">
+          <header>
+            <h2>Historical evaluation</h2>
+            <button
+              type="button"
+              onClick={() => setEvidenceOpen(false)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </header>
+          <ValidationPanel data={evidence} error={evidenceError} />
+        </aside>
       )}
 
       {stage === 'plan' && shown && selected && (

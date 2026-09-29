@@ -19,6 +19,9 @@ interface Props {
   provenanceOpen: boolean
   onProvenanceToggle: (open: boolean) => void
   onGo: (stage: Stage) => void
+  /** the held-out historical evaluation; evidence, not part of the flow */
+  evidenceOpen: boolean
+  onEvidenceToggle: (open: boolean) => void
 }
 
 export default function TopBar({
@@ -29,6 +32,8 @@ export default function TopBar({
   provenanceOpen,
   onProvenanceToggle,
   onGo,
+  evidenceOpen,
+  onEvidenceToggle,
 }: Props) {
   return (
     <header className="topbar">
@@ -70,6 +75,15 @@ export default function TopBar({
           open={provenanceOpen}
           onToggle={onProvenanceToggle}
         />
+        <button
+          type="button"
+          className={`evidence-chip${evidenceOpen ? ' is-open' : ''}`}
+          onClick={() => onEvidenceToggle(!evidenceOpen)}
+          aria-expanded={evidenceOpen}
+          data-testid="evidence-toggle"
+        >
+          Validation
+        </button>
         <span className={`live-chip${online ? '' : ' is-down'}`}>
           <span className="live-dot" aria-hidden="true" />
           {online ? 'Decision support prototype' : 'API unavailable'}

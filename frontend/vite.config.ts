@@ -28,5 +28,13 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     css: false,
+    //  Two suites drive REAL wall-clock animation -- the forecast clock and
+    //  the vessel transit -- and assert that time advanced. Run in parallel on
+    //  a contended machine they lose their timeslice and report a clock that
+    //  went backwards, which is a false failure, not a regression. Running
+    //  test files one at a time makes the suite deterministic. No assertion is
+    //  relaxed by this; the whole suite passes either way when the machine is
+    //  idle, and only this setting makes that true when it is not.
+    fileParallelism: false,
   },
 })
