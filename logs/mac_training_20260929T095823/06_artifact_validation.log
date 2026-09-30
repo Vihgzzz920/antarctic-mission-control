@@ -1,0 +1,29 @@
+{
+  "24h": {
+    "artifact_sha256": "463917f386b92e6e996506504c3662dfb0b5f828fec08c0f68e6159ed0f3682a",
+    "dataset": "data/processed/forecast_dataset.npz",
+    "dataset_sha256": "1721e165a765b31fc2866f0f7837ce9d80d2a65375d0941e1d86edd482682430",
+    "lead_hours": 24,
+    "sklearn": "1.9.1",
+    "joblib": "1.6.0",
+    "python": "3.12.14"
+  },
+  "48h": {
+    "artifact_sha256": "78adb269710a76944ead6e9458db4a29235239a803a79fc10ac2a34026c7ec26",
+    "dataset": "data/processed/forecast_dataset_48h.npz",
+    "dataset_sha256": "0aa398aa43d98edeb63ef5c8cb2b93f7141d93b54ebdf433aa814e699e3ad7f5",
+    "lead_hours": 48,
+    "sklearn": "1.9.1",
+    "joblib": "1.6.0",
+    "python": "3.12.14"
+  }
+}
+  PASS  1 24h artifact lead_hours == 24
+  PASS  2 48h artifact lead_hours == 48
+  PASS  3 artifact SHAs are distinct
+  PASS  4 48h references the 48h dataset
+  PASS  5 24h references the 24h dataset
+  PASS  6 sklearn is exactly 1.9.1
+  PASS  8 leakage checks pass
+
+all artifact checks passed

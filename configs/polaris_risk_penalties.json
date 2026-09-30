@@ -1,0 +1,33 @@
+{
+  "config_name": "POLARIS navigation risk penalties",
+  "version": "1.0.0",
+  "created": "2026-09-25",
+  "status": "PROJECT PARAMETERS. These numbers are NOT POLARIS values and carry no physical or regulatory meaning.",
+  "what_these_numbers_are": "A dimensionless penalty index this project uses to let a later navigation cost layer prefer one cell over another. IMO MSC.1/Circ.1519 defines RIO and three operational categories; it defines NO numeric penalty, weight or cost. The mapping from a POLARIS category to a number below is a design choice made by this team, tunable, and must be presented as such. Changing these values changes route preference and nothing else.",
+  "not_a_block": "No value here may be infinite and none is a prohibition. POLARIS is 'not... a Go/No Go tool but... a decision support tool' (MSC.1/Circ.1519 section 1.4). A cell with the highest penalty is discouraged, never excluded; the master decides. An infinite or sentinel penalty would be a hard block wearing a number, and is rejected by the loader.",
+  "units": "dimensionless penalty index, higher = less preferred",
+  "penalties": {
+    "normal_operation": 0.0,
+    "elevated_operational_risk": 25.0,
+    "operation_subject_to_special_consideration": 100.0,
+    "indeterminate": 100.0,
+    "unknown": 100.0
+  },
+  "rationale": {
+    "normal_operation": "No POLARIS objection to this cell. Zero penalty means this layer adds nothing; other layers still apply.",
+    "elevated_operational_risk": "Reachable only for PC1-PC7 ships (Table 1.1). Penalised but clearly preferred over special consideration.",
+    "operation_subject_to_special_consideration": "The most severe POLARIS outcome. Heavily penalised, NEVER excluded.",
+    "indeterminate": "The RIO interval crosses a Table 1.1 boundary, so no single category is defensible. Penalised at the severe end so uncertainty is not rewarded, while both endpoint classifications stay visible in the audit trail.",
+    "unknown": "No defensible RIO at all (for example SA=98 with no sea-ice stage). Penalised at the severe end: consistent with unknown_policy in the SIGRID policy, where unknown is never permissive. It is still a penalty, not an exclusion."
+  },
+  "branch_policy": {
+    "reported": "both",
+    "note": "The conservative and optimistic mappings are both penalised and both reported. Nothing downstream may read one without being able to see the other; collapsing them is a decision for the cost layer, made explicitly and with the pair still available."
+  },
+  "limits": {
+    "min_penalty": 0.0,
+    "max_penalty": 1000.0,
+    "must_be_finite": true,
+    "note": "max_penalty exists so a typo cannot smuggle in a de-facto block; it is not a claim about scale."
+  }
+}

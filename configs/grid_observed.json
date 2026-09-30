@@ -1,0 +1,81 @@
+{
+  "file": "/Users/vihaangala/Desktop/SIH/data/raw/sic_20260921.tif",
+  "size_kb": 280.8,
+  "crs": "EPSG:3976",
+  "crs_is_defined": true,
+  "crs_epsg": 3976,
+  "crs_wkt_head": "PROJCS[\"WGS 84 / NSIDC Sea Ice Polar Stereographic South\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUT...",
+  "shape_rows_cols": [
+    1328,
+    1264
+  ],
+  "band_count": 1,
+  "dtype": "uint8",
+  "nodata_declared": 0.0,
+  "transform": [
+    6250.0,
+    0.0,
+    -3950000.0,
+    0.0,
+    -6250.0,
+    4350000.0
+  ],
+  "pixel_size_x": 6250.0,
+  "pixel_size_y": 6250.0,
+  "bounds": {
+    "left": -3950000.0,
+    "bottom": -3950000.0,
+    "right": 3950000.0,
+    "top": 4350000.0
+  },
+  "row0_is_north": true,
+  "raw_min": 0.0,
+  "raw_max": 120.0,
+  "raw_mean": 49.907183520474305,
+  "n_unique": 102,
+  "unique_lowest_10": [
+    0.0,
+    1.0,
+    2.0,
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+  ],
+  "unique_highest_10": [
+    92.0,
+    93.0,
+    94.0,
+    95.0,
+    96.0,
+    97.0,
+    98.0,
+    99.0,
+    100.0,
+    120.0
+  ],
+  "inferred_scale": "0-255 byte (percent + flag codes above 100)",
+  "values_above_100": {
+    "120.0": 363102
+  },
+  "pct_above_100": 21.631,
+  "nan_count": 0,
+  "nan_pct": 0.0,
+  "nodata_count": 861148,
+  "nodata_pct": 51.302,
+  "zero_count": 861148,
+  "zero_pct": 51.302,
+  "valid_pct": 27.07,
+  "valid_min": 1.0,
+  "valid_max": 100.0,
+  "valid_mean": 88.48,
+  "pct_open_water_lt15": 1.61,
+  "pct_miz_15_80": 13.99,
+  "pct_pack_ge80": 84.4,
+  "mean_sic_top_third": 88.65,
+  "mean_sic_middle_third": 86.64,
+  "mean_sic_bottom_third": 90.11
+}

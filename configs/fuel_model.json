@@ -1,0 +1,75 @@
+{
+  "config_name": "Relative ice-resistance fuel proxy",
+  "version": "1.0.0",
+  "created": "2026-09-29",
+  "status": "ESTIMATED PROJECT PROXY. Not a measured fuel consumption model.",
+
+  "what_this_is": "A dimensionless, relative estimate of how much harder it is to push the vessel through a routing cell than through ice-free water, integrated along a route. One unit is the fuel used steaming one metre in ice-free water at the reference speed. The output is therefore in OPEN-WATER-EQUIVALENT METRES, and its only defensible use is comparing two routes computed with the SAME parameters.",
+
+  "what_this_is_not": [
+    "It is NOT litres, tonnes, kilograms, litres/hour or tonnes/day, and must never be converted to any of those from this project's data.",
+    "It is NOT an operational fuel prediction and must not be used for bunker planning, endurance, range or emissions.",
+    "It is NOT derived from any vessel's engine, hull, propeller or trials data. This repository contains none.",
+    "It is NOT a POLARIS quantity, not an IMO/WMO/NCPOR figure, and carries no regulatory meaning."
+  ],
+
+  "why_no_absolute_fuel_figure_exists": "An absolute figure needs installed power, a specific fuel consumption (SFOC) curve, displacement, hull and ice resistance, and propulsive efficiency. An audit of src/, configs/, docs/ and tests/ on 2026-09-29 found NONE of these anywhere in the repository, and the only vessel numbers present are a constant speed of 5.0 m/s (itself undocumented) and the POLARIS ice class PC6. Inventing the missing values would produce a fuel figure that looks authoritative and is not.",
+
+  "model": {
+    "equation": "estimated_fuel = sum over segments of  segment_distance_m * 0.5 * (factor(sic_A, t_depart) + factor(sic_B, t_arrive))",
+    "factor": "factor(sic) = open_water_factor + ice_penalty * (sic / 100) ** ice_exponent",
+    "edge_rule": "the trapezoid rule src/routing/time_astar.py documents for its own edges, so a route's fuel equals what a fuel-objective search minimises, exactly rather than approximately",
+    "sic_is_sampled_at": "the vessel's ARRIVAL time at each cell, from the same per-bucket field the router priced that cell with",
+    "units": "open_water_equivalent_metres",
+    "unit_definition": "1 open-water-equivalent metre = the fuel used steaming 1 m in ice-free water (sic = 0) at the reference speed, whatever that quantity physically is. It is never resolved into a mass or volume."
+  },
+
+  "parameters": {
+    "open_water_factor": {
+      "value": 1.0,
+      "status": "definition",
+      "meaning": "the factor at sic = 0. It is 1.0 BY DEFINITION, because the unit of the output is defined as the open-water case. It is not a fitted or measured quantity and changing it only rescales the unit."
+    },
+    "ice_penalty": {
+      "value": 2.0,
+      "status": "project assumption",
+      "is_this_measured": false,
+      "meaning": "the ADDITIONAL factor at 100% sea-ice concentration. At 2.0, a metre through fully consolidated ice is priced as 3.0 open-water metres.",
+      "derivation": "none. No measurement, trial, publication or dataset in this project supports this or any other value. It was chosen only to be non-degenerate: at 0.0 the model would collapse to travelled distance, which this project must not call fuel.",
+      "consequence_of_changing_it": "it changes the fuel numbers AND can change which route the fuel objective selects. That dependence is measured and reported rather than hidden: see the break-even study recorded in the model's provenance.",
+      "limits": {"min": 0.0, "max": 100.0}
+    },
+    "ice_exponent": {
+      "value": 1.5,
+      "status": "project assumption",
+      "is_this_measured": false,
+      "meaning": "how sharply the factor grows with concentration. Above 1.0 the penalty bites harder near full cover than near the ice edge.",
+      "derivation": "none. Chosen as a super-linear shape so that a marginal-ice-zone crossing and a consolidated-ice crossing are not priced on the same straight line. No published resistance curve was consulted or reproduced, and the value must not be presented as one.",
+      "limits": {"min": 0.1, "max": 5.0}
+    },
+    "absolute_rate": {
+      "value": null,
+      "status": "unavailable",
+      "meaning": "mass or volume of fuel per open-water-equivalent metre. Supplying this would turn the proxy into an absolute figure.",
+      "why_null": "no vessel consumption datum exists in this project to set it. It is left null and the code REFUSES to emit a mass or volume while it is null, rather than defaulting to a plausible-looking number.",
+      "what_would_replace_it": "a measured consumption rate for the actual vessel at the reference speed in open water, with its source"
+    },
+    "reference_speed_mps": {
+      "value": 5.0,
+      "status": "project assumption, inherited",
+      "meaning": "the speed the proxy is defined at. Taken from DEMO.vessel_speed_mps in src/api/config.py; that value itself carries no documented source.",
+      "why_speed_does_not_appear_in_the_equation": "a real speed term needs a power curve (resistance ~ v^2, power ~ v^3) anchored to a known operating point, and no such anchor exists here. Because the speed is a single constant across every route and every cell, any speed factor would multiply all candidate routes equally and could not change which route is chosen. It is therefore recorded as an assumption and deliberately left OUT of the equation instead of being faked into it."
+    }
+  },
+
+  "terms_deliberately_absent": {
+    "currents": "the routing cost's current term is isotropic and shipped at weight 0.0 (src/routing/cost.py). A per-cell scalar cannot express steaming with or against a current, so including it would imply directional modelling this project does not do.",
+    "wind": "no wind field enters the routing cost anywhere.",
+    "iceberg_exposure": "an exposure index in [0,1], not a resistance. It belongs to the risk objective, not to fuel.",
+    "POLARIS": "a dimensionless risk-preference penalty with no energy meaning.",
+    "manoeuvring_and_ice_breaking": "besetting, ramming, convoy and escort behaviour are not modelled anywhere in this project."
+  },
+
+  "suitable_for": ["relative comparison of routes computed with these same parameters"],
+  "not_suitable_for": ["operational fuel prediction", "bunker or endurance planning", "emissions reporting", "comparison against any other vessel, model or project"]
+}

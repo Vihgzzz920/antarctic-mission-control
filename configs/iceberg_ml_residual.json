@@ -1,0 +1,77 @@
+{
+  "description": "Configuration for the ML residual correction on top of the first-order physics drift baseline (src/models/iceberg_ml_residual.py). The model predicts the EAST and NORTH displacement residual over a 24 h step: observed displacement minus physics-predicted displacement, in metres, in the local geographic tangent plane. The physics baseline remains the reference; this layer only adds a correction to it.",
+  "target": {
+    "east_m": "observed_displacement_east_m - physics_displacement_east_m",
+    "north_m": "observed_displacement_north_m - physics_displacement_north_m",
+    "basis": "local geographic east/north tangent plane, the same one src/models/iceberg_physics.py integrates in",
+    "horizon_seconds": 86400.0,
+    "note": "the target is a displacement over exactly one day, so it is not transferable to a step of another length without an assumption this project has not made"
+  },
+  "features": [
+    "current_east_mps",
+    "current_north_mps",
+    "wind_east_mps",
+    "wind_north_mps",
+    "current_speed_mps",
+    "wind_speed_mps",
+    "physics_disp_east_m",
+    "physics_disp_north_m",
+    "latitude_deg",
+    "longitude_deg"
+  ],
+  "physics_displacement_features": [
+    "physics_disp_east_m",
+    "physics_disp_north_m"
+  ],
+  "features_deliberately_omitted": {
+    "size_major_km": "present on only 10.4% of the moved 24 h rows; omitted rather than imputed, per the project rule that a missing source value is never fabricated",
+    "size_minor_km": "same as size_major_km"
+  },
+  "forbidden_feature_substrings": [
+    "observed_end",
+    "observed_disp",
+    "residual",
+    "target",
+    "future",
+    "end_lat",
+    "end_lon"
+  ],
+  "population": {
+    "elapsed_days": 1,
+    "interpolation_quality": "observed_to_observed",
+    "requires_current_and_wind": true,
+    "moved_only_for_training": true,
+    "moved_definition": "great_circle_m(start, observed_end) > 0.0, using src/data/preprocess_icebergs.great_circle_m"
+  },
+  "split": {
+    "method": "chronological by start date, never randomised",
+    "train_fraction_of_moved": 0.6,
+    "validation_fraction_of_moved": 0.2,
+    "boundaries_snapped_to_whole_dates": true,
+    "snap_note": "cut points are taken at the 60th and 80th percentile of the MOVED rows and then snapped to date boundaries, so every row sharing a start date lands in the same split and no same-day pair straddles a boundary"
+  },
+  "estimator": {
+    "name": "HistGradientBoostingRegressor",
+    "random_state": 20260925,
+    "grid": [
+      {"max_iter": 100, "learning_rate": 0.05, "max_leaf_nodes": 15, "min_samples_leaf": 20},
+      {"max_iter": 200, "learning_rate": 0.05, "max_leaf_nodes": 31, "min_samples_leaf": 20},
+      {"max_iter": 100, "learning_rate": 0.1, "max_leaf_nodes": 15, "min_samples_leaf": 40}
+    ],
+    "selection_metric": "mean endpoint error in km of the corrected prediction on the VALIDATION split",
+    "grid_rationale": "three modest configurations, not a search. With 893 training rows a larger grid would be selecting on noise."
+  },
+  "limits": {
+    "min_training_rows": 200,
+    "max_abs_residual_m": 2000000.0
+  },
+  "known_limitations": [
+    "Every moved 24 h row in this dataset comes from a single sensor (ASCAT). Whatever is learned is an ASCAT-specific correction and should not be assumed to transfer to NIC, QuikSCAT or other position sources.",
+    "Longitude is used raw and is discontinuous at the antimeridian. With ~900 training rows a sin/cos encoding was not added, but a model that splits on longitude near 180 degrees is splitting on an artefact.",
+    "893 training rows is a small sample for a gradient-boosted model. The fixed three-point grid and the leaf-size floor are there to limit how much of that sample the model can memorise.",
+    "The residual target is a 24 h displacement and is not rescaled to other horizons."
+  ],
+  "not_claimed": [
+    "No improvement is asserted here. The evaluation reports measured test metrics for the constant-velocity baseline, the physics baseline and the corrected model side by side, and the numbers stand on their own."
+  ]
+}

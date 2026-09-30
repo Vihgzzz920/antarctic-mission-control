@@ -1,0 +1,51 @@
+{
+  "description": "Configuration for the iceberg forecast uncertainty cone (src/models/iceberg_uncertainty.py). The radius is CALIBRATED from the empirical radial endpoint errors of the frozen physics baseline at 24 h. Its growth to other horizons is a PROJECT ASSUMPTION, not a measured law.",
+  "calibration": {
+    "quantile": 0.9,
+    "reported_quantiles": [0.5, 0.8, 0.9],
+    "horizon_hours": 24.0,
+    "population": "clean 24 h observed->observed MOVED rows with both environmental inputs",
+    "splits_used": ["train", "validation"],
+    "split_source": "configs/iceberg_ml_residual.json, via iceberg_ml_residual.chronological_split",
+    "split_note": "the chronological split established for the residual experiment is reused verbatim so the held-out test rows are the same ones, and the uncertainty layer never sees them during calibration",
+    "min_calibration_rows": 200
+  },
+  "growth": {
+    "law": "power",
+    "exponent": 0.5,
+    "available_laws": ["power", "linear"],
+    "formula": "radius(t) = radius_24h * (t / 24h) ** exponent",
+    "linear_formula": "radius(t) = radius_24h * (t / 24h)",
+    "exponent_limits": {"min": 0.0, "max": 2.0},
+    "is_this_measured": false,
+    "assumption_statement": "The square-root exponent of 0.5 is the growth a random-walk displacement error would follow. It is ASSUMED here, not fitted: this project has exactly one empirically calibrated horizon (24 h), and the 6 clean moved 48 h rows available cannot distinguish sqrt growth from linear growth or from anything else. The linear law is provided for sensitivity testing only and MUST NOT be selected using the 48 h data.",
+    "law_selection_forbidden_on": "the 48 h rows, and any test-split row"
+  },
+  "horizons_hours_for_output": [24.0, 48.0, 72.0],
+  "empirically_calibrated_to_hours": 24.0,
+  "limits": {
+    "max_radius_km": 5000.0,
+    "min_horizon_seconds": 0.0
+  },
+  "secondary_component_statistics": {
+    "enabled": true,
+    "status": "SECONDARY - reported for information only",
+    "note": "east/north spread and their correlation are recorded so a later step can decide whether an ellipse is worth the complexity. The PRIMARY and only supported output of this layer is a circular radius, because that is what the collision-risk visualisation consumes."
+  },
+  "known_limitations": [
+    "24 h is the ONLY empirically calibrated horizon. Every other horizon, shorter or longer, is produced by the assumed growth law and carries no direct evidence.",
+    "Horizons beyond 24 h are flagged extrapolated_uncertainty = true. 48 h is supported arithmetically and is NOT empirically validated.",
+    "The calibration population is ASCAT-only: every clean moved 24 h row in this dataset comes from that sensor, so the radius describes ASCAT-derived tracks.",
+    "The radius is calibrated against the FROZEN physics baseline (windage 0.0, turn 0.0). If the physics configuration changes, this calibration is void and must be re-run.",
+    "The cone is circular by design. The secondary component statistics record whether east and north errors actually differ enough for that to matter.",
+    "Errors are radial great-circle distances between the predicted and observed endpoint; they fold together environmental error, the constant-velocity assumption and the position uncertainty of the source chart, and cannot separate them."
+  ],
+  "not_included": [
+    "collision probability",
+    "iceberg risk rasters",
+    "route costs",
+    "dynamic replanning",
+    "any machine learning",
+    "any change to the physics model"
+  ]
+}

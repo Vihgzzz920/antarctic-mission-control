@@ -1,0 +1,54 @@
+{
+  "file": "data/processed/forecast_dataset_48h.npz",
+  "size_bytes": 1790285274,
+  "sha256": "0aa398aa43d98edeb63ef5c8cb2b93f7141d93b54ebdf433aa814e699e3ad7f5",
+  "feature_names": [
+    "sic_t",
+    "current_u_t",
+    "current_v_t",
+    "current_speed_t"
+  ],
+  "lead_days": 2,
+  "lead_hours": 48,
+  "gap_days": 1,
+  "stride": 1,
+  "train": {
+    "rows": 61599018,
+    "pairs": 269,
+    "base_range": [
+      "2025-01-01",
+      "2025-09-28"
+    ],
+    "target_range": [
+      "2025-01-03",
+      "2025-09-30"
+    ]
+  },
+  "val": {
+    "rows": 21599825,
+    "pairs": 59,
+    "base_range": [
+      "2025-10-01",
+      "2025-11-28"
+    ],
+    "target_range": [
+      "2025-10-03",
+      "2025-11-30"
+    ]
+  },
+  "test": {
+    "rows": 6314231,
+    "pairs": 29,
+    "base_range": [
+      "2025-12-01",
+      "2025-12-29"
+    ],
+    "target_range": [
+      "2025-12-03",
+      "2025-12-31"
+    ]
+  },
+  "total_pairs": 357
+}
+
+GATE PASSED: 357 pairs, lead_days=2, gap_days=1, target = base + 2 days

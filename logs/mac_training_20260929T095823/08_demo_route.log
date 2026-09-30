@@ -1,0 +1,7 @@
+SKIPPED: the API test client needs httpx, which is not installed in this .venv (The starlette.testclient module requires the httpx2 package to be installed.
+You can install this with:
+    $ pip install httpx2
+).
+  Install it (test-only, unrelated to scikit-learn):
+      pip install httpx
+  then re-run this phase. The routing code was not touched.

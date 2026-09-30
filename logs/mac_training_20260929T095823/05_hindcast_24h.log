@@ -1,0 +1,31 @@
+==========================================================================
+SIC FORECAST RASTER   FORECAST / HINDCAST VALIDATION
+==========================================================================
+  origin      2025-01-08T00:00:00
+  valid       2025-01-09T00:00:00  (+24 h)
+  raster      data/processed/sic_forecast/sic_forecast_hgb_origin20250108_plus24h_valid20250109_3976.tif
+  grid        EPSG:3976  [1328, 1264]
+  valid cells 144,228 of 1,678,592
+  range       25.91 .. 98.87  (clipped cells 0)
+
+  scored on 132,930 cells against data/raw/sic_20250109.tif
+                      MAE     RMSE     bias   MAE MIZ
+  HGB +24h         14.988   22.113    3.176    20.613
+  persistence      15.436   23.661   -1.393    22.484
+  NOTE: this origin is inside the model's TRAINING period; these numbers are in-sample.
+  metrics     data/processed/sic_forecast/sic_forecast_hgb_origin20250108_plus24h_valid20250109_3976_hindcast_metrics.json
+==========================================================================
+SIC FORECAST RASTER   FORECAST / HINDCAST VALIDATION
+==========================================================================
+  origin      2025-12-15T00:00:00
+  valid       2025-12-16T00:00:00  (+24 h)
+  raster      data/processed/sic_forecast/sic_forecast_hgb_origin20251215_plus24h_valid20251216_3976.tif
+  grid        EPSG:3976  [1328, 1264]
+  valid cells 236,586 of 1,678,592
+  range       24.61 .. 98.87  (clipped cells 0)
+
+  scored on 223,516 cells against data/raw/sic_20251216.tif
+                      MAE     RMSE     bias   MAE MIZ
+  HGB +24h         11.431   17.969    3.404    19.096
+  persistence      10.647   18.141    0.248    19.862
+  metrics     data/processed/sic_forecast/sic_forecast_hgb_origin20251215_plus24h_valid20251216_3976_hindcast_metrics.json

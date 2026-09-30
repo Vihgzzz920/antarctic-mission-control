@@ -1,0 +1,29 @@
+{
+  "config_name": "Navigation cost composition parameters",
+  "version": "1.0.0",
+  "created": "2026-09-25",
+  "status": "PROJECT PARAMETERS. Not POLARIS values, not measured quantities.",
+  "composition": "composed_cost = environmental_cost + polaris_penalty + coverage_uncertainty_weight * (1 - dominant_fraction)",
+  "terms": {
+    "environmental_cost": "from src/routing/cost.py, unchanged. Its +inf for blocked or unpriceable cells passes straight through; this layer never introduces one.",
+    "polaris_penalty": "from configs/polaris_risk_penalties.json via src/routing/polaris_risk.py, for the DOMINANT polygon only. Never recomputed, never area-weighted, never combined across polygons.",
+    "coverage_uncertainty": "coverage_uncertainty_weight x (1 - dominant_fraction). Applied ONLY to a cell that has USNIC coverage and a valid dominant polygon."
+  },
+  "coverage_uncertainty_weight": 0.0,
+  "coverage_uncertainty_weight_note": "DELIBERATELY ZERO. No defensible value exists before sensitivity testing, and inventing one would put an unjustified safety weighting into every route. At 0.0 the term contributes nothing and the composed cost equals environmental + POLARIS, which is the honest starting point. Raise it here, never in code, and report the sensitivity when you do.",
+  "limits": {
+    "min_weight": 0.0,
+    "max_weight": 1000.0,
+    "must_be_finite": true,
+    "note": "An infinite weight would be a hard navigation block wearing a number and is rejected by the loader. Hard constraints belong to NavigationDomain and constraints.py, never here."
+  },
+  "not_applied_to": {
+    "uncharted_cells": "A cell with no USNIC coverage receives NO POLARIS penalty and NO coverage-uncertainty term. Absence of a chart is not a risk measurement, and charging for it would penalise every cell outside the chart's extent. Its environmental cost still applies.",
+    "water_polygons": "A charted WATER polygon has no POLARIS RIO by design, so it receives no POLARIS penalty. It is charted, so the coverage-uncertainty term does apply.",
+    "hard_constraints": "Land, bathymetry and ice-shelf exclusions are applied by NavigationDomain/constraints.py. This layer produces preferences only."
+  },
+  "branches": {
+    "reported": "both",
+    "note": "The conservative and optimistic POLARIS readings are composed separately and both are returned. Collapsing them is a later, explicit decision."
+  }
+}

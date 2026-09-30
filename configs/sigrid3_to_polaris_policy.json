@@ -1,0 +1,244 @@
+{
+  "policy_name": "USNIC Antarctic SIGRID-3 -> POLARIS ice-regime interpretation policy",
+  "version": "1.0.0",
+  "created": "2026-09-25",
+  "status": "PROTOTYPE. Conservative interpretation by this project. NOT an IMO-prescribed mapping.",
+  "authority_note": "IMO MSC.1/Circ.1519 states only that 'Ice types in POLARIS generally conform to WMO nomenclature used on ice charts with the exception that Medium First Year Ice and Multi Year Ice are given two RIVs.' It gives NO rule for mapping an aggregate WMO stage onto one of its columns and does NOT prescribe using the next most severe category. Every entry in stage_mapping whose status is INTERPRETED is therefore this project's policy, defensible but not authoritative, and must be presented as such wherever a RIO derived from it is shown. POLARIS is explicitly 'not... a Go/No Go tool but... a decision support tool' (MSC.1/Circ.1519 section 1.4); nothing here may be rendered as a hard prohibition.",
+  "sources": {
+    "polaris": "IMO MSC.1/Circ.1519, Appendix (POLARIS), Tables 1.1, 1.3, 1.4",
+    "sigrid3": "WMO/JCOMM Technical Report 23, SIGRID-3: A vector archive format for sea ice charts, Tables 4.1 and 4.2",
+    "wmo_nomenclature": "WMO Sea-Ice Nomenclature (WMO No. 259), as reproduced in ECCC MANICE chapter 1 section 1.2",
+    "dataset": "U.S. National Ice Center Arctic and Antarctic Sea Ice Charts in SIGRID-3 Format, NSIDC G10013, DOI 10.7265/4b7s-rn93",
+    "dataset_userguide": "NSIDC G10013 user guide (Antarctic SA=98 iceberg convention; USNIC analysts do not differentiate medium and thick first-year ice in Antarctic charts)"
+  },
+  "derived_from_chart": {
+    "chart": "ANTARC20201224",
+    "polygons_total": 680,
+    "polygons_ice": 675,
+    "polygons_water": 5,
+    "sea_ice_stage_codes_observed": ["83", "86", "87", "95", "97"],
+    "note": "This policy covers ONLY the stage codes observed in that chart. A code not listed in stage_mapping or non_sea_ice_codes must be handled by unlisted_code_policy, never by a nearest-match guess."
+  },
+  "riv_tables": {
+    "default": "configs/polaris_riv_table_1_3.json",
+    "decayed_ice": "configs/polaris_riv_table_1_4.json",
+    "selection_policy": {
+      "default_table": "default",
+      "decayed_ice_requires": "explicit_operator_confirmation",
+      "may_infer_from": [],
+      "must_never_infer_from": ["date", "season", "latitude", "temperature", "air_temperature", "month"],
+      "evidence": "MSC.1/Circ.1519: 'The standard Risk Index Values of table 1.3 should be used unless ice decay is confirmed by ice information/visual observation by personnel qualified in accordance with chapter 12 of the Polar Code.'",
+      "caveats": [
+        "IMO's 2025 POLARIS review records that when and where decayed ice applies is unresolved, especially for the Antarctic.",
+        "configs/polaris_riv_table_1_4.json rests on two independent source reproductions; table 1.3 rests on four."
+      ]
+    },
+    "mapping_applies_to_both_tables": true,
+    "mapping_invariance_evidence": "Verified numerically against both RIV configs: for all five parent codes the conservative child is the same POLARIS column in table 1.3 and table 1.4. Decay changes RIV magnitudes but never reorders which child is most severe."
+  },
+  "stage_mapping": {
+    "83": {
+      "sigrid_label": "Young Ice",
+      "thickness_cm": [10, 30],
+      "wmo_definition": "Ice in the transition stage between nilas and first-year ice, 10-30 cm in thickness.",
+      "polaris_children_in_range": ["Grey Ice", "Grey White Ice"],
+      "conservative": "Grey White Ice",
+      "optimistic": "Grey Ice",
+      "status": "INTERPRETED",
+      "mapping_sensitive": true,
+      "evidence": "Parent of Grey Ice (10-15 cm) and Grey-White Ice (15-30 cm). Grey White is never less severe: equal RIV for PC1-IA, strictly lower for IB, IC and Not Ice Strengthened. Maximum exposure 1 RIV point.",
+      "observed_polygons": 11
+    },
+    "86": {
+      "sigrid_label": "First Year Ice",
+      "thickness_cm": [30, 200],
+      "wmo_definition": "Sea ice of not more than one winter's growth, developing from young ice; 30 cm or greater.",
+      "polaris_children_in_range": [
+        "Thin First Year Ice 1st Stage",
+        "Thin First Year Ice 2nd Stage less than 1 m thick",
+        "Medium First Year Ice",
+        "Medium First Year Ice less than 1 m thick",
+        "Thick First Year Ice"
+      ],
+      "conservative": "Thick First Year Ice",
+      "optimistic": "Thin First Year Ice 1st Stage",
+      "status": "INTERPRETED",
+      "mapping_sensitive": true,
+      "evidence": "Spans five POLARIS columns. Thick First Year Ice is the strict minimum for PC4 through Not Ice Strengthened and tied for PC1-PC3, so it is never less severe. WIDEST SPREAD IN THIS CHART: for Not Ice Strengthened the children run from -2 to -6, a 36-point RIO swing at 9/10 concentration.",
+      "observed_polygons": 192
+    },
+    "87": {
+      "sigrid_label": "Thin First Year Ice",
+      "thickness_cm": [30, 70],
+      "wmo_definition": "First-year ice 30-70 cm thick; first stage 30-50 cm, second stage 50-70 cm.",
+      "polaris_children_in_range": [
+        "Thin First Year Ice 1st Stage",
+        "Thin First Year Ice 2nd Stage less than 1 m thick"
+      ],
+      "conservative": "Thin First Year Ice 2nd Stage less than 1 m thick",
+      "optimistic": "Thin First Year Ice 1st Stage",
+      "status": "INTERPRETED",
+      "mapping_sensitive": true,
+      "evidence": "Parent of both thin first-year stages. 2nd Stage is the strict minimum for PC6, IA Super, IA, IB, IC and Not Ice Strengthened, tied elsewhere. The POLARIS column's 'less than 1 m thick' qualifier is satisfied by the SIGRID definition itself, since 70 cm < 1 m. Maximum exposure 1 RIV point.",
+      "observed_polygons": 47
+    },
+    "95": {
+      "sigrid_label": "Old Ice",
+      "thickness_cm": null,
+      "wmo_definition": "Sea ice which has survived at least one summer's melt. Parent of Second-Year Ice and Multi-Year Ice.",
+      "polaris_children_in_range": [
+        "Second Year Ice",
+        "Light Multi Year Ice less than 2.5 m thick",
+        "Heavy Multi Year Ice"
+      ],
+      "conservative": "Heavy Multi Year Ice",
+      "optimistic": "Second Year Ice",
+      "status": "INTERPRETED",
+      "mapping_sensitive": true,
+      "evidence": "Spans three POLARIS columns. Heavy Multi Year Ice is the strict minimum for PC2, PC3, PC4 and IC and tied elsewhere; Second Year Ice is never the unique minimum. HIGHEST IMPACT BY VOLUME: present on 358 of 675 ice polygons (53%) in ANTARC20201224, so this single decision moves the result more than any other.",
+      "observed_polygons": 358
+    },
+    "97": {
+      "sigrid_label": "Multi-Year Ice",
+      "thickness_cm": null,
+      "wmo_definition": "Old ice which has survived at least two summers' melt.",
+      "polaris_children_in_range": [
+        "Light Multi Year Ice less than 2.5 m thick",
+        "Heavy Multi Year Ice"
+      ],
+      "conservative": "Heavy Multi Year Ice",
+      "optimistic": "Light Multi Year Ice less than 2.5 m thick",
+      "status": "DIRECT_CATEGORY_INTERPRETED_REFINEMENT",
+      "mapping_sensitive": true,
+      "evidence": "The CATEGORY matches POLARIS exactly; only the Light/Heavy refinement is undetermined. MSC.1/Circ.1519 gates that refinement on the operator, not the chart: the Light column 'may be used' only 'where the operator can confidently determine' the thickness. Heavy is therefore the correct default rather than a guess. Heavy is the strict minimum for PC2, PC3, PC4 and IC, tied elsewhere.",
+      "observed_polygons": 23
+    }
+  },
+  "non_sea_ice_codes": {
+    "98": {
+      "sigrid_label": "Glacier Ice",
+      "polaris_ice_type": null,
+      "has_riv": false,
+      "handling": "iceberg_fraction",
+      "evidence": "POLARIS assigns no RIV to glacial ice. IMO's 2025 POLARIS review states glacial ice is 'not covered at all in POLARIS, recognized as an issue during development.' Must never be given a RIV, including the Ice-Free RIV."
+    },
+    "00": {
+      "sigrid_label": "Ice Free",
+      "polaris_ice_type": "Ice-Free",
+      "has_riv": true,
+      "handling": "sea_ice",
+      "evidence": "Direct correspondence; used to close a regime to ten tenths."
+    }
+  },
+  "sentinel_values": {
+    "-9": {
+      "meaning": "deliberately unused",
+      "evidence": "SIGRID-3: 'Any mandatory ice field that is not used must be filled with a dummy variable of -9.'",
+      "must_never_be_treated_as": ["zero", "ice free", "absent ice"]
+    },
+    "80": { "meaning": "No Stage of Development", "resolves_to": "unknown" },
+    "99": { "meaning": "Undetermined / Unknown", "resolves_to": "unknown" }
+  },
+  "unlisted_code_policy": {
+    "action": "unknown",
+    "rationale": "A stage code not in stage_mapping or non_sea_ice_codes has no defended mapping. Fail closed: mark the cell unknown and report the code. Never nearest-match."
+  },
+  "concentration": {
+    "units": "tenths",
+    "never_collapse_interval_to_point": true,
+    "representation": "[low_tenths, high_tenths]",
+    "ct_codes": {
+      "92": [10, 10], "13": [1, 3], "24": [2, 4],
+      "46": [4, 6], "68": [6, 8], "81": [8, 10], "00": [0, 0]
+    },
+    "ct_codes_note": "Only 92 is exact. 81 encodes 8/10-10/10, the trailing 1 meaning ten tenths (SIGRID-3 Table 4.1). The six codes listed are those observed in ANTARC20201224; an unlisted CT code follows unlisted_code_policy.",
+    "partial_codes": {
+      "00": [0, 0], "10": [1, 1], "20": [2, 2], "30": [3, 3], "40": [4, 4], "50": [5, 5],
+      "60": [6, 6], "70": [7, 7], "80": [8, 8], "90": [9, 9], "92": [10, 10]
+    },
+    "partial_special": {
+      "01": "trace_less_than_one_tenth",
+      "99": "unknown",
+      "-9": "unused"
+    },
+    "residual_rule": "Where named fractions total less than ten tenths, close the regime with Ice-Free. Never close it with a sea-ice type.",
+    "observed_consistency": "In ANTARC20201224, CA+CB+CC == CT in 93/93 exact cases and fell inside the interval in 4/4; CA+CB == CT in 183/183 two-component polygons."
+  },
+  "missing_partials_policy": {
+    "trigger": "CA, CB and CC all -9 on an ice polygon",
+    "action": "treat the single named stage as the whole of CT, remainder Ice-Free",
+    "cell_state": "partials_absent",
+    "status": "INTERPRETATION",
+    "disclaimer": "SIGRID-3 does NOT define -9 to mean 'all of CT is this stage'. It defines -9 as a deliberately unused field, which is consistent with 'only one type present' and equally consistent with 'the analyst did not resolve the breakdown'. This reading is the project's policy.",
+    "must_not": ["distribute CT across unnamed stages", "infer a second stage", "drop the polygon silently"],
+    "observed_polygons": 253
+  },
+  "iceberg_policy": {
+    "sa_98_with_concentration": {
+      "meaning": "glacier ice present as an explicit partial concentration (CA, typically 1/10)",
+      "action": "carry the iceberg fraction as a separate non-RIV term; widen the RIO bounds to cover it",
+      "lower_bound_assigns": "the most severe RIV present in that polygon's own regime",
+      "upper_bound_assigns": "Ice-Free",
+      "must_not": [
+        "assign the iceberg fraction the Ice-Free RIV as a point value",
+        "assign it any sea-ice RIV as a point value",
+        "renormalise the sea-ice fractions to absorb it"
+      ],
+      "rationale": "Assigning Ice-Free would credit the cell for containing icebergs; assigning a sea-ice RIV would fabricate an ice type. Both bounds are computed from published RIVs, so neither invents a value.",
+      "observed_polygons": 325
+    },
+    "so_98_trace": {
+      "meaning": "CN field: ice thicker than SA present at less than 1/10 concentration",
+      "action": "boolean flag icebergs_trace_present; never enters the RIO sum",
+      "rationale": "POLARIS has no sub-tenth term.",
+      "observed_polygons": 350
+    },
+    "sa_98_with_sb_missing": {
+      "meaning": "icebergs present, total concentration stated, NO sea-ice stage named anywhere",
+      "action": "unknown",
+      "cell_state": "unknown",
+      "must_not": ["infer a sea-ice stage", "borrow a neighbouring polygon's stage", "default to any RIV"],
+      "observed_polygons": 44
+    },
+    "chart_note": "In ANTARC20201224 SA=98 and SO=98 are perfectly complementary across all 675 ice polygons: every ice cell carries an iceberg record in one form or the other.",
+    "field_source_note": "CN and CD are available as the DBF columns SO and SD respectively (verified 680/680 against the ICECODE string); parsing ICECODE is not required."
+  },
+  "antarctic_field_convention": {
+    "rule": "per polygon, not chart-wide",
+    "if_sa_equals_98": "sea-ice stages are read from SB and SC; CA carries the iceberg fraction",
+    "otherwise": "sea-ice stages are read from SA, SB and SC as normal",
+    "evidence": "NSIDC G10013 user guide: 'In much of Antarctica, the SIGRID code for the stage of development of the thickest, oldest sea ice, SA, is the reserved as a placeholder to mark the presence of icebergs. The stage of development of the thickest, oldest sea ice is given in the SIGRID code SB.' The phrase 'in much of' is why this is tested per polygon. In ANTARC20201224 the convention applies to 325 of 675 ice polygons (48%), so neither a blanket SA rule nor a blanket SB rule is correct."
+  },
+  "cell_states": {
+    "resolved": "stage and exact concentrations known; RIO is a single value",
+    "interval": "concentration known only as a range; RIO is an interval",
+    "partials_absent": "no CA/CB/CC breakdown; single named stage interpreted as the whole of CT",
+    "unknown": "no defensible RIO; see unknown_policy"
+  },
+  "rio_reporting": {
+    "rio_is_an_interval": true,
+    "classify_by": "worse_endpoint",
+    "display": "both endpoints and the operational category of each",
+    "flag_band_straddle": "Where the interval crosses a Table 1.1 boundary the operational category is indeterminate and must be reported as such.",
+    "mapping_sensitive_flag": "For any cell whose stage code has mapping_sensitive true, also compute the optimistic child. Where conservative and optimistic land in different Table 1.1 bands, flag the cell mapping_sensitive so the ambiguity is visible rather than hidden."
+  },
+  "unknown_policy": {
+    "rule": "unknown is never navigable by default",
+    "must_not": [
+      "substitute a default RIV",
+      "substitute a default stage",
+      "treat unknown as ice free",
+      "omit unknown cells from the audit trail"
+    ],
+    "rationale": "Consistent with the -9999 unknown handling in the bathymetry layer."
+  },
+  "human_in_the_loop": {
+    "final_authority": "the ship's master",
+    "evidence": "MSC.1/Circ.1519 section 1.4: the methodologies 'should not be interpreted as a Go/No Go tool but as a decision support tool', with decisions resting on personnel qualified under Polar Code chapter 12.",
+    "implication": "A special-consideration outcome is a penalty and a warning by default, not a hard exclusion."
+  },
+  "open_items": [
+    "Line-by-line verification of both RIV tables against an IMO-issued copy of MSC.1/Circ.1519 is still outstanding.",
+    "This policy is derived from one chart (ANTARC20201224). Codes absent there (84, 85, 88, 89, 91, 93, 96, 82, 81) have no entry and will fail closed."
+  ]
+}
